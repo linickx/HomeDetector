@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-# pylint: disable=no-member # <- Weird Reactor Error 🤷🏻‍♂️
 # pylint: disable=W0718
 import sys
+import logging
+import time
+import socket
 import re
 import sqlite3
-import netaddr
-import hashlib
 import datetime
+import hashlib
 
-try: # https://twisted.org
-    from twisted.internet import reactor, defer
-    from twisted.names import client, dns, server
+try:
+    from dnslib.dns import DNSError, DNSQuestion
+    from dnslib import DNSRecord,QTYPE,RCODE
+    from dnslib.server import DNSServer,BaseResolver,DNSLogger
 except ModuleNotFoundError:
-    print('Twisted not Installed - try pip install twisted')
+    print('Dnslib not Installed - try pip install dnslib')
     sys.exit(1)
 
-# setup Twisted Logging. https://stackoverflow.com/a/49111089
-from twisted.logger import Logger, LogLevel, LogLevelFilterPredicate, FilteringLogObserver, textFileLogObserver, globalLogPublisher
-observer = FilteringLogObserver(textFileLogObserver(sys.stdout), [LogLevelFilterPredicate(defaultLogLevel=LogLevel.info)])
-globalLogPublisher.addObserver(observer)
+try:
+    import netaddr
+except ModuleNotFoundError:
+    print('netaddr not Installed - try pip install netaddr')
+    sys.exit(1)
 
 # Some VARS
 DB_SCHEMA = 'CREATE TABLE "dns-fw" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
@@ -29,19 +32,21 @@ CONFIG_DB_PATH = "./"               # Make config option
 CONFIG_DB_NAME = "dns-fw.db"        # Later, this should be user config
 
 # CLasses & Functions...
-class DNSServerFirewall(server.DNSServerFactory):
-    log = Logger()
-    sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}")
-    sql_cursor = sql_connection.cursor()
+class DNSServerFirewall(BaseResolver):
 
+    def __init__(self,upstream:list,timeout:float=5, dnsfw_logger:logging=logging):
+        self.resolvers = upstream
+        self.resolver_timeout = timeout
+        self.log = dnsfw_logger
+        self.sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
+        self.sql_cursor = self.sql_connection.cursor()
 
     def learningMode(self, source_ip):
         """
             Check if Source IP is in Learning More or Not
         """
-        self.log.debug("Source IP -> {ip}", ip=source_ip)
+        self.log.debug("Source IP -> %s", source_ip)
         return True # Default True in development
-
 
     def create_id(self, input_array:list=None, some_salt:str=DB_ID_SALT):
         """
@@ -53,7 +58,7 @@ class DNSServerFirewall(server.DNSServerFactory):
             * `String`
         """
         if not isinstance(input_array, list):
-            self.log.warn("Input is not a list {i}", i=str(input_array))
+            self.log.warning("Input is not a list %s", str(input_array))
             return "ERROR: Input not list"
         # https://www.pythoncentral.io/hashing-strings-with-python/
         hash_object = hashlib.sha256(some_salt.join(input_array).encode())
@@ -72,7 +77,12 @@ class DNSServerFirewall(server.DNSServerFactory):
         sql_id = None
         sql_counter = 0
 
-        sql_rows = self.sql_cursor.execute('SELECT "scope_type", "scope", "id", "counter" FROM "dns-fw" WHERE domain = ?', (domain,)).fetchall()
+        try:
+            sql_rows = self.sql_cursor.execute('SELECT "scope_type", "scope", "id", "counter" FROM "dns-fw" WHERE domain = ?', (domain,)).fetchall()
+        except Exception:
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            return sql_id, sql_counter
+
         for row in sql_rows:
 
             scope_type = row[0].strip()
@@ -92,17 +102,10 @@ class DNSServerFirewall(server.DNSServerFactory):
                 sql_id = str(row[2]).strip()
                 sql_counter = int(row[3])
 
-        self.log.info('🌍 For {domain}, IP {ip} => ID: {id} ({c})', domain=domain, ip=source_ip, id=sql_id, c=sql_counter)
+        self.log.info('🌍 For %s, IP %s => ID: %s (%s)', domain, source_ip, sql_id, sql_counter)
         return sql_id, sql_counter
 
-    def updatesql(self, results, query, source_ip):
-        """
-            Do SQL Updates...
-        """
-        self.log.info("Source IP -> {ip}", ip=source_ip)
-        self.log.info("RESULTS ---> {d}", d=str(results))
-        self.log.info("QUERY ---> {d}", d=str(query))
-        domain = results[0][0]
+    def updatesql(self, domain, source_ip):
         last_seen = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
         sql_id, sql_counter = self.findSQLid(source_ip=source_ip, domain=domain)
         if sql_id is None:
@@ -124,7 +127,7 @@ class DNSServerFirewall(server.DNSServerFactory):
                     params
                 )
             except Exception:
-                self.log.error("Exception: {s1} - {s2}", s1=str(sys.exc_info()[0]), s2=str(sys.exc_info()[1]))
+                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
         else:
             sql_counter +=1                     # Increment the counter
             params = (
@@ -138,112 +141,139 @@ class DNSServerFirewall(server.DNSServerFactory):
                     'UPDATE "dns-fw" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
                 )
             except Exception:
-                self.log.error("Exception: {s1} - {s2}", s1=str(sys.exc_info()[0]), s2=str(sys.exc_info()[1]))
-        self.sql_connection.commit()
-
+                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+        try:
+            self.sql_connection.commit()
+        except Exception:
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
 
         return # Not Implemented Yet
 
-    def findDomain(self, records):
-        """
-            Takes DNS Lookup (Records) and finds domain it belongs to via SOA.
-        """
-        the_domain = None
-        the_type = None
+    def findDomain(self, domainname):
+        # https://github.com/paulc/dnslib/blob/master/dnslib/client.py
+        result = None
+        try:
+            q = DNSRecord(q=DNSQuestion(domainname,getattr(QTYPE,'SOA')))
+            a_pkt = q.send(self.resolvers[0],53,tcp=False)
+            a = DNSRecord.parse(a_pkt)
 
-        self.log.debug("RECORDS IN --> {r}", r=str(records))
-        for rec in records:
-            self.log.debug("⏺️ : r= {r}", r=str(rec))
+            if q.header.id != a.header.id:
+                raise DNSError('Response transaction id does not match query transaction id')
 
-            if len(rec) > 0:                            # Some Responses are empty
-                r_type = dns.QUERY_TYPES[rec[0].type]   # Convert number type to human readable
-                r_name = rec[0].name                    # Record Name
-                self.log.debug("⏺️ --> name: {n}, type {t}", n=str(r_name), t=str(r_type))
-                if r_type == "SOA":                     # Yes! We wan This
-                    the_domain = str(r_name)            # This the the Domain name for the query!
-                    the_type = r_type
-        if the_type is not None:
-            self.log.info("🥰 Found Domain -> {d} ", d=the_domain)
-        return the_domain, the_type
+            if a.header.tc == False:
+                # Truncated - retry in TCP mode
+                a_pkt = q.send(self.resolvers[0],53,tcp=True)
+                a = DNSRecord.parse(a_pkt)
 
-    def newRequest(self, domainname, source_ip):
-        """
-            This sets up a new resolver client to perform our own SOA lookup
-        """
-        r = client
-        d = defer.gatherResults([r.lookupAuthority(domainname).addCallback(self.findDomain)])   # Lookup & Find Domain Name
-        d.addCallback(self.updatesql, domainname, source_ip)                                    # Send Domain Name to SQL
-        return
+            self.log.debug("SHORT --> %s", a.short)
+            self.log.debug("LONG --> %s", a)
+            self.log.debug("AUTHY >--> %s", a.auth)
+            result = str(a.auth[0].get_rname())
+            self.log.info("🥰 Found Domain -> %s ", result)
 
-    def allowQuery(self, message, protocol, address):
-        """
-            Called by DNSServerFactory.messageReceived to decide whether to process a received message or to reply with dns.EREFUSED.
-            REF: https://docs.twistedmatrix.com/en/stable/api/twisted.names.server.DNSServerFactory.html#allowQuery
-        """
+        except DNSError:
+            self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+            return result
+        return result
 
-        self.log.debug("[allowQuery] Connection from {addr}", addr=address)
-        self.log.debug("m = {m}", m=message)
-        self.log.debug("p = {p}", p=protocol)
+    def resolve(self,request,handler):
+        reply = request.reply()
+        qname = request.q.qname
+        qtype = QTYPE[request.q.qtype]
+        src_ip = handler.client_address[0]
 
-        self.log.info("✨ {a} -> {q} [Type: {t}]", a=address[0], q=message.queries[0].name, t=dns.QUERY_TYPES[message.queries[0].type])
+        self.log.info("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
 
-        if self.learningMode(address[0]):
-            self.newRequest(str(message.queries[0].name), str(address[0]))
+        the_domain = self.findDomain(qname)
 
-        if re.search("yahoo", str(message.queries[0].name), re.IGNORECASE):
-            self.log.warn("🔥 Blocked {n}", n=message.queries[0].name)
-            return False
+        if the_domain is None:
+            self.log.error('😫 Failed to lookup domain for %s', qname)
+        else:
+            self.updatesql(the_domain,src_ip)
 
-        return True
+        if re.search("yahoo", str(qname), re.IGNORECASE):
+            self.log.warning("🔥 Blocked %s", qname)
+            reply.header.rcode = getattr(RCODE,'NXDOMAIN')
+            return reply
 
-def bootstrap():
+        try:
+            # TODO: Loop this for multiple name-servers
+            if handler.protocol == 'udp':
+                proxy_r = request.send(self.resolvers[0],int(53),timeout=self.resolver_timeout)
+            else:
+                proxy_r = request.send(self.resolvers[0],int(53),timeout=self.resolver_timeout,tcp=True)
+            reply = DNSRecord.parse(proxy_r)
+        except socket.timeout:
+            reply.header.rcode = getattr(RCODE,'SERVFAIL')
 
-    log = Logger()
+        return reply
+
+def bootstrap(log=logging):
     status = True
     try:
         connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}")
     except Exception:
-        log.error("Exception: {s1} - {s2}", s1=str(sys.exc_info()[0]), s2=str(sys.exc_info()[1]))
+        log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         status = False
     else:
-        log.info('Connected to SQLite DB {p}/{n}', p=CONFIG_DB_PATH, n=CONFIG_DB_NAME)
+        log.info('Connected to SQLite DB %s/%s', CONFIG_DB_PATH, CONFIG_DB_NAME)
 
-    cursor = connection.cursor()
+    #cursor = connection.cursor()
     try:
-        cursor.execute(DB_SCHEMA)
+        connection.execute(DB_SCHEMA)
     except sqlite3.OperationalError:
         if re.search("table \"dns-fw\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
             log.debug('DB Schema - Nothing to do')
             status = True
         else:
-            log.error("Exception: {s1} - {s2}", s1=str(sys.exc_info()[0]), s2=str(sys.exc_info()[1]))
+            log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
             status = False
     except Exception:
-        log.error("Exception: {s1} - {s2}", s1=str(sys.exc_info()[0]), s2=str(sys.exc_info()[1]))
+        log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         status = False
     else:
         log.info('DB SCHEMA Created')
 
-    cursor.close() # Ok, all good, it's close.
+    #cursor.close()
+    connection.commit()
+    connection.close() # Ok, all good, it's close.
     return status
+
 
 def main():
     """
-    Run the server - https://docs.twisted.org/en/stable/names/index.html
+    Run the server - https://github.com/paulc/dnslib/blob/master/dnslib/intercept.py
     """
-    factory = DNSServerFirewall(
-        clients=[client]
-    )
-
-    protocol = dns.DNSDatagramProtocol(controller=factory)
-
-    reactor.listenUDP(10053, protocol)
-    reactor.listenTCP(10053, factory)
-    reactor.run()
-
 
 if __name__ == "__main__":
-    if not bootstrap():
-        print('bootstap failed, exiting...')
+    log_handler = logging.StreamHandler()
+    log_handler.setFormatter(logging.Formatter(fmt='%(asctime)s [%(name)s:%(funcName)s] %(levelname)s: %(message)s ', datefmt="%Y-%m-%d %H:%M:%S")) # (%(thread)d %(threadName)s)
+    fw_logger = logging.getLogger("DNSServerFirewall")
+    fw_logger.addHandler(log_handler)
+    fw_logger.setLevel(logging.INFO)
+
+    if not bootstrap(fw_logger):
+        fw_logger.critical('bootstrap failed, exiting...')
         sys.exit(1)
-    raise SystemExit(main())
+
+    resolver = DNSServerFirewall(upstream=["1.1.1.1"], dnsfw_logger=fw_logger)
+
+    LOG_HOOKS = "truncated,error" #LOG_HOOKS = "request,reply,truncated,error"
+    LOG_PREFIX = True
+    dns_logger = DNSLogger(LOG_HOOKS,LOG_PREFIX)
+
+    udp_server = DNSServer(resolver,
+                        address="",
+                        port=10053,
+                        logger=dns_logger)
+    udp_server.start_thread()
+
+    tcp_server = DNSServer(resolver,
+                        address="",
+                        port=10053,
+                        logger=dns_logger,
+                        tcp=True)
+    tcp_server.start_thread()
+
+    while udp_server.isAlive():
+        time.sleep(1)
