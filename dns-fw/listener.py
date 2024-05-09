@@ -240,23 +240,11 @@ def bootstrap(log=logging):
     return status
 
 
-def main():
+def main(dnsfw_logger):
     """
     Run the server - https://github.com/paulc/dnslib/blob/master/dnslib/intercept.py
     """
-
-if __name__ == "__main__":
-    log_handler = logging.StreamHandler()
-    log_handler.setFormatter(logging.Formatter(fmt='%(asctime)s [%(name)s:%(funcName)s] %(levelname)s: %(message)s ', datefmt="%Y-%m-%d %H:%M:%S")) # (%(thread)d %(threadName)s)
-    fw_logger = logging.getLogger("DNSServerFirewall")
-    fw_logger.addHandler(log_handler)
-    fw_logger.setLevel(logging.INFO)
-
-    if not bootstrap(fw_logger):
-        fw_logger.critical('bootstrap failed, exiting...')
-        sys.exit(1)
-
-    resolver = DNSServerFirewall(upstream=["1.1.1.1"], dnsfw_logger=fw_logger)
+    resolver = DNSServerFirewall(upstream=["1.1.1.1"], dnsfw_logger=dnsfw_logger)
 
     LOG_HOOKS = "truncated,error" #LOG_HOOKS = "request,reply,truncated,error"
     LOG_PREFIX = True
@@ -277,3 +265,16 @@ if __name__ == "__main__":
 
     while udp_server.isAlive():
         time.sleep(1)
+
+if __name__ == "__main__":
+    log_handler = logging.StreamHandler()
+    log_handler.setFormatter(logging.Formatter(fmt='%(asctime)s [%(name)s:%(funcName)s] %(levelname)s: %(message)s ', datefmt="%Y-%m-%d %H:%M:%S")) # (%(thread)d %(threadName)s)
+    fw_logger = logging.getLogger("DNSServerFirewall")
+    fw_logger.addHandler(log_handler)
+    fw_logger.setLevel(logging.INFO)
+
+    if not bootstrap(fw_logger):
+        fw_logger.critical('bootstrap failed, exiting...')
+        sys.exit(1)
+
+    main(fw_logger)
