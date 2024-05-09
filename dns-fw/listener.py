@@ -191,8 +191,8 @@ class DNSServerFirewall(BaseResolver):
         else:
             self.updatesql(the_domain,src_ip)
 
-        if re.search("yahoo", str(qname), re.IGNORECASE):
-            self.log.warning("🔥 Blocked %s", qname)
+        if re.search("awsglobalaccelerator", str(the_domain), re.IGNORECASE):
+            self.log.warning("🔥 Blocked Authority Domain %s for Request %s", the_domain, qname)
             reply.header.rcode = getattr(RCODE,'NXDOMAIN')
             return reply
 
