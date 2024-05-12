@@ -295,7 +295,7 @@ class DNSServerFirewall(BaseResolver):
                 self.log.error('😫 Failed to lookup domain for %s', qname)
 
             if not self.passThePacket(the_domain_action):
-                self.log.warning("🔥 New Authority Domain %s Detected for Request %s 🔥", the_domain, qname)
+                self.log.warning("🔥 Authority Domain %s Detected for Request %s 🔥", the_domain, qname)
                 if the_domain_id is None:
                     self.updatesql(the_domain,src_ip,'block')
                 if DNS_FIREWALL_ON:
@@ -306,7 +306,7 @@ class DNSServerFirewall(BaseResolver):
         resolver_counter = 0
         resolver_reply = False
         while (resolver_counter < len(self.resolvers)):
-            self.log.info("Trying %s for %s", self.resolvers[resolver_counter], qname)
+            self.log.info("❓ %s -> %s", qname, self.resolvers[resolver_counter])
             try:
                 if handler.protocol == 'udp':
                     proxy_r = request.send(self.resolvers[resolver_counter],int(53),timeout=self.resolver_timeout)
@@ -319,7 +319,7 @@ class DNSServerFirewall(BaseResolver):
                 self.log.error('TIMEOUT %s -> %s', self.resolvers[resolver_counter], qname)
 
             if resolver_reply:
-                self.log.info('%s found %s', self.resolvers[resolver_counter], str(reply.rr))
+                self.log.info('✅ [%s]: %s', self.resolvers[resolver_counter], str(reply.rr))
                 return reply
             resolver_counter+=1
 
