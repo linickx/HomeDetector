@@ -27,6 +27,9 @@ except ModuleNotFoundError:
 DB_SCHEMA = 'CREATE TABLE "dns-fw" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 
+SOA_FAIL_ACTION = "ignore" # what to do if SOA lookup fails.
+DEFAULT_LEARN = None        # Should default IPs learn? (True => Yes, False => Block, None => Ignore)
+
 # Initial Config vars.
 CONFIG_DB_PATH = "./"               # Make config option
 CONFIG_DB_NAME = "dns-fw.db"        # Later, this should be user config
@@ -48,9 +51,39 @@ class DNSServerFirewall(BaseResolver):
     def learningMode(self, source_ip):
         """
             Check if Source IP is in Learning More or Not
+
+            # False => Block
+            # True => Pass
+            # None => Ignore
+
         """
         self.log.debug("Source IP -> %s", source_ip)
-        return True # Default True in development
+
+        known_src_ips = [
+            {'ip':'127.0.0.1', 'type':'host', 'learn':False},
+        ]
+
+        for ip_config in known_src_ips:
+            if ip_config['ip'] == source_ip:
+                return ip_config['learn']
+
+        return DEFAULT_LEARN
+
+    def passThePacket(self, action:str):
+        """
+            ## Make a decision.
+            ### Input
+            1. action/block => False
+            2. action/else (pass|ignore) => True
+            ### Return
+            # Bool
+
+        """
+        self.log.debug("SQL -> %s", action)
+        if action == "block":
+            return False
+
+        return True
 
     def create_id(self, input_array:list=None, some_salt:str=DB_ID_SALT):
         """
@@ -69,7 +102,7 @@ class DNSServerFirewall(BaseResolver):
         hex_dig = hash_object.hexdigest()
         return str(hex_dig)
 
-    def findSQLid(self, domain:str=None, source_ip:str=None):
+    def findSQLid(self, domain:str=None, source_ip:str=None, sql_action:str=None):
         """
             ## Find the SQL Row ID for a domain/ip pair
             ### Input:
@@ -81,11 +114,21 @@ class DNSServerFirewall(BaseResolver):
         sql_id = None
         sql_counter = 0
 
+        if sql_action is None:
+
+            mode = self.learningMode(source_ip)
+            if mode is None:
+                sql_action = 'ignore'
+            elif mode:
+                sql_action = 'pass'
+            else:
+                sql_action = 'block'
+
         try:
-            sql_rows = self.sql_cursor.execute('SELECT "scope_type", "scope", "id", "counter" FROM "dns-fw" WHERE domain = ?', (domain,)).fetchall()
+            sql_rows = self.sql_cursor.execute('SELECT "scope_type", "scope", "id", "counter", "action" FROM "dns-fw" WHERE domain = ?', (domain,)).fetchall()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-            return sql_id, sql_counter
+            return sql_id, sql_counter, sql_action
 
         for row in sql_rows:
 
@@ -105,11 +148,12 @@ class DNSServerFirewall(BaseResolver):
             if source_ip in scope:
                 sql_id = str(row[2]).strip()
                 sql_counter = int(row[3])
+                sql_action = str(row[4]).strip()
 
-        self.log.info('🌍 For %s, IP %s => ID: %s (%s)', domain, source_ip, sql_id, sql_counter)
-        return sql_id, sql_counter
+        self.log.info('🌍 For %s, IP %s => ID: %s (%s/%s)', domain, source_ip, sql_id, sql_counter, sql_action)
+        return sql_id, sql_counter, sql_action
 
-    def updatesql(self, domain:str, source_ip:str):
+    def updatesql(self, domain:str, source_ip:str, action:str=None):
         """
             ## Update the SQL DB
             ### Input:
@@ -119,8 +163,8 @@ class DNSServerFirewall(BaseResolver):
             * N/A
         """
         last_seen = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
-        sql_id, sql_counter = self.findSQLid(source_ip=source_ip, domain=domain)
-        if sql_id is None:
+        sql_id, sql_counter, sql_action = self.findSQLid(source_ip=source_ip, domain=domain, sql_action=action)
+        if sql_id is None and (sql_action in ["pass" , "block"]):
             sql_id = self.create_id([domain, source_ip, 'host'])    # Create a new ID
             params = (
                         sql_id,
@@ -129,7 +173,7 @@ class DNSServerFirewall(BaseResolver):
                         sql_counter,
                         source_ip,
                         "host",
-                        "pass",
+                        sql_action,
                         last_seen,
                     )
             self.log.debug(str(params))
@@ -140,7 +184,7 @@ class DNSServerFirewall(BaseResolver):
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-        else:
+        elif sql_id is not None and sql_action != "ignore":
             sql_counter +=1                     # Increment the counter
             params = (
                   sql_counter,
@@ -154,12 +198,13 @@ class DNSServerFirewall(BaseResolver):
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+
         try:
             self.sql_connection.commit()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
 
-        return # Not Implemented Yet
+        return sql_action, sql_id
 
     def sendSOArequest(self, soa_query:DNSRecord, index:int=0, tcp:bool=False):
         """
@@ -183,7 +228,7 @@ class DNSServerFirewall(BaseResolver):
 
         return a_pkt
 
-    def findDomain(self, domainname:str):
+    def findDomain(self, domain_query:str, source_ip:str):
         """
             ## From the query, send a new DNS Request (SOA) to find the domain name of the host/domainname.
             REF: https://github.com/paulc/dnslib/blob/master/dnslib/client.py
@@ -194,8 +239,10 @@ class DNSServerFirewall(BaseResolver):
         """
 
         result = None
+        result_id = None
+        result_action = SOA_FAIL_ACTION
 
-        q = DNSRecord(q=DNSQuestion(domainname,getattr(QTYPE,'SOA')))
+        q = DNSRecord(q=DNSQuestion(domain_query,getattr(QTYPE,'SOA')))
 
         counter=0
         while counter < len(self.resolvers):
@@ -222,10 +269,13 @@ class DNSServerFirewall(BaseResolver):
             result = str(a.auth[0].get_rname())
             self.log.info("🥰 Found Domain -> %s ", result)
         except DNSError:
-            self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+            self.log.error("DNSERROR Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         except Exception:
-            self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
-        return result
+            self.log.error("General Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+
+        if result is not None:
+            result_action, result_id = self.updatesql(result,source_ip)
+        return result, result_action, result_id
 
     def resolve(self,request,handler):
         """
@@ -238,16 +288,17 @@ class DNSServerFirewall(BaseResolver):
 
         self.log.info("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
 
-        the_domain = self.findDomain(qname)
-        if the_domain is None:
-            self.log.error('😫 Failed to lookup domain for %s', qname)
-        else:
-            self.updatesql(the_domain,src_ip)
+        if self.learningMode(src_ip) is not None:
+            the_domain, the_domain_action, the_domain_id = self.findDomain(qname, src_ip)
+            if the_domain is None:
+                self.log.error('😫 Failed to lookup domain for %s', qname)
 
-        if re.search("awsglobalaccelerator", str(the_domain), re.IGNORECASE):
-            self.log.warning("🔥 Blocked Authority Domain %s for Request %s", the_domain, qname)
-            reply.header.rcode = getattr(RCODE,'NXDOMAIN')
-            return reply
+            if not self.passThePacket(the_domain_action):
+                self.log.warning("🔥 Blocked Authority Domain %s for Request %s", the_domain, qname)
+                if the_domain_id is None:
+                    self.updatesql(the_domain,src_ip,'block')
+                reply.header.rcode = getattr(RCODE,'NXDOMAIN')
+                return reply
 
         resolver_counter = 0
         resolver_reply = False
