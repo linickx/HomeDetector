@@ -27,8 +27,9 @@ except ModuleNotFoundError:
 DB_SCHEMA = 'CREATE TABLE "dns-fw" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 
-SOA_FAIL_ACTION = "ignore" # what to do if SOA lookup fails.
+SOA_FAIL_ACTION = "ignore"  # what to do if SOA lookup fails.
 DEFAULT_LEARN = None        # Should default IPs learn? (True => Yes, False => Block, None => Ignore)
+DNS_FIREWALL_ON = True      # If set to false, notify (detect) mode only
 
 # Initial Config vars.
 CONFIG_DB_PATH = "./"               # Make config option
@@ -294,11 +295,13 @@ class DNSServerFirewall(BaseResolver):
                 self.log.error('😫 Failed to lookup domain for %s', qname)
 
             if not self.passThePacket(the_domain_action):
-                self.log.warning("🔥 Blocked Authority Domain %s for Request %s", the_domain, qname)
+                self.log.warning("🔥 New Authority Domain %s Detected for Request %s 🔥", the_domain, qname)
                 if the_domain_id is None:
                     self.updatesql(the_domain,src_ip,'block')
-                reply.header.rcode = getattr(RCODE,'NXDOMAIN')
-                return reply
+                if DNS_FIREWALL_ON:
+                    self.log.info("🔥🔥 DOMAIN BLOCKED %s 🔥🔥", the_domain)
+                    reply.header.rcode = getattr(RCODE,'NXDOMAIN')
+                    return reply
 
         resolver_counter = 0
         resolver_reply = False
