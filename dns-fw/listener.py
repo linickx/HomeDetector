@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=W0718
 import sys
+import os
 import logging
 import time
 import socket
@@ -32,8 +33,12 @@ DEFAULT_LEARN = None        # Should default IPs learn? (True => Yes, False => B
 DNS_FIREWALL_ON = True      # If set to false, notify (detect) mode only
 
 # Initial Config vars.
-CONFIG_DB_PATH = "./"               # Make config option
-CONFIG_DB_NAME = "dns-fw.db"        # Later, this should be user config
+if os.path.exists("/share/"):
+    CONFIG_DB_PATH = "/share/"
+else:
+    CONFIG_DB_PATH = "./"               # Make config option
+
+CONFIG_DB_NAME = "dns.db"        # Later, this should be user config
 
 # CLasses & Functions...
 class DNSServerFirewall(BaseResolver):
