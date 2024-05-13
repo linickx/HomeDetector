@@ -294,7 +294,12 @@ class DNSInterceptor(BaseResolver):
 
         self.log.info("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
 
-        if self.learningMode(src_ip) is not None:
+        if self.learningMode(src_ip) is None:
+            log_qu = ""
+            log_ans = ""
+        else:
+            log_qu = "❓"   # Add icons for things in learning Mode... (Question)
+            log_ans = "✅"  # (Answer)
             the_domain, the_domain_action, the_domain_id = self.findDomain(qname, src_ip)
             if the_domain is None:
                 self.log.error('😫 Failed to lookup domain for %s', qname)
@@ -311,7 +316,7 @@ class DNSInterceptor(BaseResolver):
         resolver_counter = 0
         resolver_reply = False
         while (resolver_counter < len(self.resolvers)):
-            self.log.info("❓ %s -> %s", qname, self.resolvers[resolver_counter])
+            self.log.info("%s %s -> %s", log_qu, qname, self.resolvers[resolver_counter])
             try:
                 if handler.protocol == 'udp':
                     proxy_r = request.send(self.resolvers[resolver_counter],int(53),timeout=self.resolver_timeout)
@@ -324,7 +329,7 @@ class DNSInterceptor(BaseResolver):
                 self.log.error('TIMEOUT %s -> %s', self.resolvers[resolver_counter], qname)
 
             if resolver_reply:
-                self.log.info('✅ [%s]: %s', self.resolvers[resolver_counter], str(reply.rr))
+                self.log.info('%s [%s]: %s', log_ans, self.resolvers[resolver_counter], str(reply.rr))
                 return reply
             resolver_counter+=1
 
