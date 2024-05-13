@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # pylint: disable=W0718
 import sys
+import json
 import os
 import logging
 import time
@@ -10,27 +11,78 @@ import sqlite3
 import datetime
 import hashlib
 
+logger = logging.getLogger("HomeAssistant")
+log_handler = logging.StreamHandler()
+log_handler.setFormatter(logging.Formatter(fmt='%(asctime)s [%(name)s:%(funcName)s] %(levelname)s: %(message)s ', datefmt="%Y-%m-%d %H:%M:%S")) # (%(thread)d %(threadName)s)
+logger.addHandler(log_handler)
+logger.setLevel(logging.INFO)
+
 try:
     from dnslib.dns import DNSError, DNSQuestion
     from dnslib import DNSRecord,QTYPE,RCODE
     from dnslib.server import DNSServer,BaseResolver,DNSLogger
 except ModuleNotFoundError:
-    print('Dnslib not Installed - try pip install dnslib')
+    logger.error('Dnslib not Installed - try pip install dnslib')
     sys.exit(1)
 
 try:
     import netaddr
 except ModuleNotFoundError:
-    print('netaddr not Installed - try pip install netaddr')
+    logger.error('netaddr not Installed - try pip install netaddr')
     sys.exit(1)
 
-# Some VARS
+# Some Configurable Options
+try:
+    with open('/data/options.json', "r", encoding="utf8") as file:
+        options_f = file.read()
+except Exception:
+    logger.info('🚨🚨 Unable to -> FIND <- Home Assistant Options, will use DEFAULTS 🚨🚨')
+else:
+    try:
+        options_data = json.loads(options_f)
+    except Exception:
+        logger.error('🚨🚨 Unable to ==> LOAD <== Home Assistant Options, will use DEFAULTS 🚨🚨')
+        logger.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+
+DEFAULT_LEARN = None # Should default IPs learn? (True => Yes, False => Block, None => Ignore)
+try:
+    if options_data['default_action'] in ['ignore', 'learn', 'block']:
+        if options_data['default_action'] == 'learn':
+            DEFAULT_LEARN = True
+        if options_data['default_action'] == 'block':
+            DEFAULT_LEARN = False
+except Exception:
+    pass
+logger.info('🫥  default_action => %s' % DEFAULT_LEARN)
+
+SOA_FAIL_ACTION = "ignore" # what to do if SOA lookup fails.
+try:
+    if options_data['soa_lookup_action'] in ['ignore', 'block']:
+        SOA_FAIL_ACTION = options_data['soa_lookup_action']
+except Exception:
+    pass
+finally:
+    logger.info('🫥  soa_lookup_action => %s' % SOA_FAIL_ACTION)
+
+DNS_FIREWALL_ON = False      # Default => notify (detect) mode only
+try:
+    DNS_FIREWALL_ON = bool(options_data['dns_blocking_mode'])
+except Exception:
+    pass
+finally:
+    logger.info('🫥  dns_blocking_mode => %s' % DNS_FIREWALL_ON)
+
+DEBUG_MODE = False      # Default => INFO
+try:
+    DEBUG_MODE = bool(options_data['debug'])
+except Exception:
+    pass
+finally:
+    logger.info('🫥  debug => %s' % DEBUG_MODE)
+
+# Some Internal VARS
 DB_SCHEMA = 'CREATE TABLE "domains" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
-
-SOA_FAIL_ACTION = "ignore"  # what to do if SOA lookup fails.
-DEFAULT_LEARN = None        # Should default IPs learn? (True => Yes, False => Block, None => Ignore)
-DNS_FIREWALL_ON = True      # If set to false, notify (detect) mode only
 
 # Initial Config vars.
 if os.path.exists("/share/"):
@@ -397,7 +449,11 @@ def main(dnsi_logger):
     """
     resolver = DNSInterceptor(upstream=get_resolvers(log=dnsi_logger), dnsi_logger=dnsi_logger)
 
-    LOG_HOOKS = "truncated,error" #LOG_HOOKS = "request,reply,truncated,error"
+    if DEBUG_MODE:
+        LOG_HOOKS = "request,reply,truncated,error"
+    else:
+        LOG_HOOKS = "truncated,error"
+
     LOG_PREFIX = True
     dns_logger = DNSLogger(LOG_HOOKS,LOG_PREFIX)
 
@@ -418,11 +474,12 @@ def main(dnsi_logger):
         time.sleep(1)
 
 if __name__ == "__main__":
-    log_handler = logging.StreamHandler()
-    log_handler.setFormatter(logging.Formatter(fmt='%(asctime)s [%(name)s:%(funcName)s] %(levelname)s: %(message)s ', datefmt="%Y-%m-%d %H:%M:%S")) # (%(thread)d %(threadName)s)
     main_logger = logging.getLogger("DNSInterceptor")
     main_logger.addHandler(log_handler)
-    main_logger.setLevel(logging.INFO)
+    if DEBUG_MODE:
+        main_logger.setLevel(logging.DEBUG)
+    else:
+        main_logger.setLevel(logging.INFO)
 
     if not bootstrap(main_logger):
         main_logger.critical('bootstrap failed, exiting...')
