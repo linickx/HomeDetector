@@ -1,7 +1,7 @@
 name: Home Detector
 description: A lightweight intrusion detector.
 version: "0.0.1"
-slug: dns-fw
+slug: homedetector
 init: false
 arch:
   - aarch64
