@@ -1,0 +1,17 @@
+---
+configuration:
+  debug:
+    name: Debug Mode
+    description: Toggle on for Debug Logs
+  networks:
+    name: Local IoT Networks
+    description: List the Hosts, Ranges, Network (subnets) you wish to monitor DNS
+  default_action:
+    name: Default Action
+    description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore, learn, block
+  soa_lookup_action:
+    name: SOA Failure Action
+    description: What to do when SOA lookups fail. Default is ignore. Valid Options => ignore or block
+  dns_blocking_mode:
+    name: DNS Blocking (FW)
+    description: Block for unusual requests. Default is disabled.

@@ -1,0 +1,33 @@
+name: Home Detector
+description: A lightweight intrusion detector.
+version: "0.0.1"
+slug: dns-fw
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: services
+map:
+  - share:rw
+ports:
+  10053/tcp: 10053
+  10053/udp: 10053
+options:
+  debug: false
+  networks:
+    - 192.168.0.0/24:network
+    - 192.168.10.10:host
+    - 192.168.100.100-101:range
+  default_action: ignore
+  soa_lookup_action: ignore
+  dns_blocking_mode: false
+schema:
+  debug: bool
+  networks:
+    - str
+  default_action: str
+  soa_lookup_action: str
+  dns_blocking_mode: bool
