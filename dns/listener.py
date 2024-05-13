@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     sys.exit(1)
 
 # Some VARS
-DB_SCHEMA = 'CREATE TABLE "dns-fw" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
+DB_SCHEMA = 'CREATE TABLE "domains" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 
 SOA_FAIL_ACTION = "ignore"  # what to do if SOA lookup fails.
@@ -41,16 +41,16 @@ else:
 CONFIG_DB_NAME = "dns.db"        # Later, this should be user config
 
 # CLasses & Functions...
-class DNSServerFirewall(BaseResolver):
+class DNSInterceptor(BaseResolver):
 
-    def __init__(self,upstream:list,timeout:float=5, dnsfw_logger:logging=logging):
+    def __init__(self,upstream:list,timeout:float=5, dnsi_logger:logging=logging):
         self.resolvers = upstream
 
         self.resolver_timeout = timeout/2   # We're making 2x DNS lookups for each request
         if self.resolver_timeout == 0:      # So make our timeout half
             self.resolver_timeout = 1       # Add one, just in case rounding ends up a zero.
 
-        self.log = dnsfw_logger
+        self.log = dnsi_logger
         self.sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
         self.sql_cursor = self.sql_connection.cursor()
 
@@ -131,7 +131,7 @@ class DNSServerFirewall(BaseResolver):
                 sql_action = 'block'
 
         try:
-            sql_rows = self.sql_cursor.execute('SELECT "scope_type", "scope", "id", "counter", "action" FROM "dns-fw" WHERE domain = ?', (domain,)).fetchall()
+            sql_rows = self.sql_cursor.execute('SELECT "scope_type", "scope", "id", "counter", "action" FROM "domains" WHERE domain = ?', (domain,)).fetchall()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             return sql_id, sql_counter, sql_action
@@ -185,7 +185,7 @@ class DNSServerFirewall(BaseResolver):
             self.log.debug(str(params))
             try:
                 self.sql_cursor.execute(                       # Create a new Row
-                    'INSERT INTO "dns-fw" ("id", "domain", "domain_type", "counter", "scope", "scope_type", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    'INSERT INTO "domains" ("id", "domain", "domain_type", "counter", "scope", "scope_type", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                     params
                 )
             except Exception:
@@ -200,7 +200,7 @@ class DNSServerFirewall(BaseResolver):
             self.log.debug(str(params))
             try:
                 self.sql_cursor.execute(   # Update the existing Row
-                    'UPDATE "dns-fw" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
+                    'UPDATE "domains" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
@@ -351,7 +351,7 @@ def bootstrap(log:logging=logging):
     try:
         connection.execute(DB_SCHEMA)
     except sqlite3.OperationalError:
-        if re.search("table \"dns-fw\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
+        if re.search("table \"domains\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
             log.debug('DB Schema - Nothing to do')
             status = True
         else:
@@ -386,11 +386,11 @@ def get_resolvers(log:logging=logging):
     log.info('Using Resolvers -> %s', str(resolvers))
     return resolvers
 
-def main(dnsfw_logger):
+def main(dnsi_logger):
     """
     Run the server - https://github.com/paulc/dnslib/blob/master/dnslib/intercept.py
     """
-    resolver = DNSServerFirewall(upstream=get_resolvers(log=dnsfw_logger), dnsfw_logger=dnsfw_logger)
+    resolver = DNSInterceptor(upstream=get_resolvers(log=dnsi_logger), dnsi_logger=dnsi_logger)
 
     LOG_HOOKS = "truncated,error" #LOG_HOOKS = "request,reply,truncated,error"
     LOG_PREFIX = True
@@ -415,12 +415,12 @@ def main(dnsfw_logger):
 if __name__ == "__main__":
     log_handler = logging.StreamHandler()
     log_handler.setFormatter(logging.Formatter(fmt='%(asctime)s [%(name)s:%(funcName)s] %(levelname)s: %(message)s ', datefmt="%Y-%m-%d %H:%M:%S")) # (%(thread)d %(threadName)s)
-    fw_logger = logging.getLogger("DNSServerFirewall")
-    fw_logger.addHandler(log_handler)
-    fw_logger.setLevel(logging.INFO)
+    main_logger = logging.getLogger("DNSInterceptor")
+    main_logger.addHandler(log_handler)
+    main_logger.setLevel(logging.INFO)
 
-    if not bootstrap(fw_logger):
-        fw_logger.critical('bootstrap failed, exiting...')
+    if not bootstrap(main_logger):
+        main_logger.critical('bootstrap failed, exiting...')
         sys.exit(1)
 
-    main(fw_logger)
+    main(main_logger)

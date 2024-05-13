@@ -6,7 +6,7 @@ RUN \
     python3 py3-pip py3-virtualenv
 
 
-COPY dns-fw/requirements.txt /tmp/
+COPY dns/requirements.txt /tmp/
 
 RUN virtualenv /env
 ENV VIRTUAL_ENV /env
@@ -16,6 +16,6 @@ RUN pip install --requirement /tmp/requirements.txt
 
 COPY run.sh /
 RUN chmod a+x /run.sh
-COPY dns-fw/listener.py /
+COPY dns/listener.py /
 
 CMD [ "/run.sh" ]
