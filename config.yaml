@@ -20,7 +20,7 @@ options:
   networks:
     - 192.168.0.0/24:network
     - 192.168.10.10:host
-    - 192.168.100.100-101:range
+    - 192.168.100.100-192.168.100.101:range
   default_action: ignore
   soa_lookup_action: ignore
   dns_blocking_mode: false
