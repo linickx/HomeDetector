@@ -44,6 +44,17 @@ else:
         logger.error('🚨🚨 Unable to ==> LOAD <== Home Assistant Options, will use DEFAULTS 🚨🚨')
         logger.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
 
+DEBUG_MODE = False      # Default => INFO
+try:
+    DEBUG_MODE = bool(options_data['debug'])
+except Exception:
+    pass
+finally:
+    logger.info('🫥  debug => %s', DEBUG_MODE)
+    if DEBUG_MODE:
+        logger.setLevel(logging.DEBUG)
+
+
 DEFAULT_LEARN = None # Should default IPs learn? (True => Yes, False => Block, None => Ignore)
 try:
     if options_data['default_action'] in ['ignore', 'learn', 'block']:
@@ -53,7 +64,7 @@ try:
             DEFAULT_LEARN = False
 except Exception:
     pass
-logger.info('🫥  default_action => %s' % DEFAULT_LEARN)
+logger.info('🫥  default_action => %s',  DEFAULT_LEARN)
 
 SOA_FAIL_ACTION = "ignore" # what to do if SOA lookup fails.
 try:
@@ -62,7 +73,7 @@ try:
 except Exception:
     pass
 finally:
-    logger.info('🫥  soa_lookup_action => %s' % SOA_FAIL_ACTION)
+    logger.debug('🫥  soa_lookup_action => %s',  SOA_FAIL_ACTION)
 
 DNS_FIREWALL_ON = False      # Default => notify (detect) mode only
 try:
@@ -70,15 +81,15 @@ try:
 except Exception:
     pass
 finally:
-    logger.info('🫥  dns_blocking_mode => %s' % DNS_FIREWALL_ON)
+    logger.info('🫥  dns_blocking_mode => %s', DNS_FIREWALL_ON)
 
-DEBUG_MODE = False      # Default => INFO
+LOCAL_NETWORKS = [] # LAN / IoT Network
 try:
-    DEBUG_MODE = bool(options_data['debug'])
+    LOCAL_NETWORKS = options_data['networks']
 except Exception:
-    pass
+    LOCAL_NETWORKS.append('127.0.0.1') # Local Host for Testing :)
 finally:
-    logger.info('🫥  debug => %s' % DEBUG_MODE)
+    logger.debug('🫥  Loading Networks => %s', str(LOCAL_NETWORKS))
 
 # Some Internal VARS
 DB_SCHEMA = 'CREATE TABLE "domains" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "scope_type" TEXT, "action" TEXT,"last_seen" TEXT)'
@@ -95,8 +106,10 @@ CONFIG_DB_NAME = "dns.db"        # Later, this should be user config
 # CLasses & Functions...
 class DNSInterceptor(BaseResolver):
 
-    def __init__(self,upstream:list,timeout:float=5, dnsi_logger:logging=logging):
+    def __init__(self,upstream:list,timeout:float=5, dnsi_logger:logging=logging, local_ips:list=None):
         self.resolvers = upstream
+        self.local_ips = local_ips
+        self.local_networks = []
 
         self.resolver_timeout = timeout/2   # We're making 2x DNS lookups for each request
         if self.resolver_timeout == 0:      # So make our timeout half
@@ -117,14 +130,53 @@ class DNSInterceptor(BaseResolver):
         """
         self.log.debug("Source IP -> %s", source_ip)
 
-        known_src_ips = [
-            {'ip':'127.0.0.1', 'type':'host', 'learn':False},
-        ]
+        if len(self.local_networks) == 0: # Process the HA Config
 
-        for ip_config in known_src_ips:
-            if ip_config['ip'] == source_ip:
-                return ip_config['learn']
+            for ha_config in self.local_ips:
+                scope_config = str(ha_config).split(':')
 
+                try:
+                    scope_type = scope_config[1]
+                except IndexError:
+                    self.log.warning('[ASSUMING HOST] - No IP Type (Host/Network/Range) set for %s', str(ha_config))
+                    scope_type = 'host'
+
+                if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', str(scope_config[0]).strip()):
+                    scope_ip = str(scope_config[0]).strip()
+                else:
+                    self.log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', str(scope_config[0]).strip())
+                    continue
+
+                if scope_type == 'host':
+                    self.log.debug('%s is Host', scope_ip)
+                    scope = netaddr.IPSet([netaddr.IPAddress(scope_ip)])
+                elif scope_type == 'network':
+                    self.log.debug('%s is Network', scope_ip)
+                    scope = netaddr.IPSet([netaddr.IPNetwork(scope_ip)])
+                elif scope_type == 'range':
+                    self.log.debug('%s is Range', scope_ip)
+                    ip_range = str(scope_ip).strip().split('-')
+                    try:
+                        scope = netaddr.IPSet([netaddr.IPRange(ip_range[0], ip_range[1])])
+                    except Exception:
+                        self.log.error("Problem Reading Range -> %s", scope_ip)
+                        self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+                        continue
+                else:
+                    self.log.critical('Unknown Scope type in DB -> {u}', u=scope_type)
+                    scope = netaddr.IPSet() # <- Empty IP Set
+
+                self.local_networks.append(scope)
+
+            self.log.info('%s/%s local scopes loaded.', len(self.local_networks), len(self.local_ips))
+
+        if len(self.local_networks) > 0:
+            for scope in self.local_networks:
+                if source_ip in scope:
+                    self.log.debug("Source IP -> %s -> LEARNING", source_ip)
+                    return True
+
+        self.log.debug("Source IP -> %s -> DEFAULT: %s", source_ip, DEFAULT_LEARN)
         return DEFAULT_LEARN
 
     def passThePacket(self, action:str):
@@ -447,7 +499,11 @@ def main(dnsi_logger):
     """
     Run the server - https://github.com/paulc/dnslib/blob/master/dnslib/intercept.py
     """
-    resolver = DNSInterceptor(upstream=get_resolvers(log=dnsi_logger), dnsi_logger=dnsi_logger)
+    resolver = DNSInterceptor(
+        upstream=get_resolvers(log=dnsi_logger),
+        dnsi_logger=dnsi_logger,
+        local_ips=LOCAL_NETWORKS
+        )
 
     if DEBUG_MODE:
         LOG_HOOKS = "request,reply,truncated,error"
