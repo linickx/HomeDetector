@@ -24,6 +24,7 @@ options:
   unknown_ip_action: ignore
   soa_failure_action: ignore
   dns_blocking_mode: false
+  learning_duration: 30
 schema:
   debug: bool
   networks:
@@ -31,3 +32,4 @@ schema:
   unknown_ip_action: str
   soa_failure_action: str
   dns_blocking_mode: bool
+  learning_duration: int

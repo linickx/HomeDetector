@@ -91,6 +91,14 @@ except Exception:
 finally:
     logger.debug('🫥  Loading Networks => %s', str(LOCAL_NETWORKS))
 
+LEARNING_DURATION = 30
+try:
+    LEARNING_DURATION = int(options_data['learning_duration'])
+except Exception:
+    pass
+finally:
+    logger.info('🫥  learning_duration => %s days', str(LEARNING_DURATION))
+
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
 DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
@@ -200,8 +208,20 @@ class DNSInterceptor(BaseResolver):
                         self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                 else:
                     action = sql_rows[0][1]
-                    created = sql_rows[0][2]
-                    self.log.debug('ID: %s | Action: %s | Created: %s', sql_rows[0], action, created)
+                    created = datetime.datetime.fromisoformat(sql_rows[0][2])
+                    now = datetime.datetime.now(datetime.UTC)
+                    delta = now - created
+                    self.log.debug('ID: %s | Action: %s | Created: %s | %s days old', sql_rows[0], action, created, delta.days)
+
+                    if delta.days >= LEARNING_DURATION and (action != "block"):
+                        action = "block"
+                        self.log.warning('🔥🔥 Learning Mode over for %s Setting to detect new domains 🔥🔥', source_ip)
+                        try:
+                            self.sql_cursor.execute(   # Update the existing Row
+                                f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
+                            )
+                        except Exception:
+                            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
 
                 self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
 

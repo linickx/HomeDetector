@@ -15,3 +15,6 @@ configuration:
   dns_blocking_mode:
     name: DNS Blocking (FW)
     description: Block for unusual requests. Default is disabled.
+  learning_duration:
+    name: Learning Mode Duration
+    description: How long should a network range learn/pass domains before alerting on anomalies
