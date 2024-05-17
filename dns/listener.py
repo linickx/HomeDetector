@@ -93,7 +93,7 @@ finally:
 
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
-DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT,"domain_type" TEXT,"counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
+DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
 DB_T_NETWORKS = "networks"
 DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
@@ -305,7 +305,6 @@ class DNSInterceptor(BaseResolver):
             params = (
                         sql_id,
                         domain,
-                        "learn",
                         sql_counter,
                         scope_id,
                         sql_action,
@@ -314,7 +313,7 @@ class DNSInterceptor(BaseResolver):
             self.log.debug(str(params))
             try:
                 self.sql_cursor.execute(                       # Create a new Row
-                    f'INSERT INTO "{DB_T_DOMAINS}" ("id", "domain", "domain_type", "counter", "scope", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    f'INSERT INTO "{DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?)',
                     params
                 )
             except Exception:
