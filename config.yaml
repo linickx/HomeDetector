@@ -21,13 +21,13 @@ options:
     - 192.168.0.0/24:network
     - 192.168.10.10:host
     - 192.168.100.100-192.168.100.101:range
-  default_action: ignore
-  soa_lookup_action: ignore
+  unknown_ip_action: ignore
+  soa_failure_action: ignore
   dns_blocking_mode: false
 schema:
   debug: bool
   networks:
     - str
-  default_action: str
-  soa_lookup_action: str
+  unknown_ip_action: str
+  soa_failure_action: str
   dns_blocking_mode: bool

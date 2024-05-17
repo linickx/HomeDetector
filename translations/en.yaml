@@ -6,10 +6,10 @@ configuration:
   networks:
     name: Local IoT Networks
     description: List the Hosts, Ranges, Network (subnets) you wish to monitor DNS
-  default_action:
-    name: Default Action
-    description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore, learn, block
-  soa_lookup_action:
+  unknown_ip_action:
+    name: Unknown IP (Default) Action
+    description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block
+  soa_failure_action:
     name: SOA Failure Action
     description: What to do when SOA lookups fail. Default is ignore. Valid Options => ignore or block
   dns_blocking_mode:
