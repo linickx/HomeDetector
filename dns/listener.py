@@ -214,18 +214,18 @@ class DNSInterceptor(BaseResolver):
             Populate self.networks from HomeAssistant and SQL DB
         """
         for ha_config in self.local_ips:
-            scope_config = str(ha_config).split(':')
+            scope_address = str(ha_config['address']).strip()
 
             try:
-                scope_type = scope_config[1]
-            except IndexError:
+                scope_type = str(ha_config['type']).strip()
+            except KeyError:
                 self.log.warning('[ASSUMING HOST] - No IP Type (Host/Network/Range) set for %s', str(ha_config))
                 scope_type = 'host'
 
-            if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', str(scope_config[0]).strip()):
-                scope_ip = str(scope_config[0]).strip()
+            if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', scope_address):
+                scope_ip = scope_address
             else:
-                self.log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', str(scope_config[0]).strip())
+                self.log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', scope_address)
                 continue
 
             scope = self.getscope(scope_type, scope_ip)

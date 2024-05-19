@@ -27,7 +27,8 @@ options:
 schema:
   debug: bool
   networks:
-    - str
+    - address: str
+      type: str
   unknown_ip_action: str
   detect_on_host_query: bool
   soa_failure_action: str
