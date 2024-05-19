@@ -107,6 +107,14 @@ except Exception:
 finally:
     logger.info('🫥  learning_duration => %s days', str(LEARNING_DURATION))
 
+UPSTREAM_RESOLVERS = [] # DNS Servers
+try:
+    UPSTREAM_RESOLVERS = options_data['resolvers']
+except Exception:
+    pass
+finally:
+    logger.debug('🫥  Custom Resolvers => %s', str(UPSTREAM_RESOLVERS))
+
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
 DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
@@ -137,7 +145,9 @@ CONFIG_DB_NAME = "dns.db"        # Later, this should be user config
 class DNSInterceptor(BaseResolver):
 
     def __init__(self,upstream:list,timeout:float=5, dnsi_logger:logging=logging, local_ips:list=None):
-        self.resolvers = upstream
+        self.log = dnsi_logger
+
+        self.resolvers = self.__loadResolvers(upstream)
         self.local_ips = local_ips
         self.local_networks = []
         self.known_hosts = []
@@ -146,13 +156,30 @@ class DNSInterceptor(BaseResolver):
         if self.resolver_timeout == 0:      # So make our timeout half
             self.resolver_timeout = 1       # Add one, just in case rounding ends up a zero.
 
-        self.log = dnsi_logger
         self.sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
         self.sql_cursor = self.sql_connection.cursor()
 
         if len(self.local_networks) == 0: # Process the HA Config
             self.__loadnetworks()
             self.log.info('%s/%s local scopes loaded.', len(self.local_networks), len(self.local_ips))
+
+    def __loadResolvers(self, resolvers:list):
+        """
+            Convert Messy List into List with Dicts
+        """
+        upstream_servers = []
+
+        for r in resolvers:
+            rs = r.split(':')
+            rhost = rs[0]
+            try:
+                rport = int(rs[1])
+            except (IndexError, ValueError):
+                rport = 53
+            upstream_servers.append({'ip':rhost, 'port':rport})
+
+        self.log.debug('Resolvers -> %s', str(upstream_servers))
+        return upstream_servers
 
     def getscope(self, scope_type, scope_ip):
         """
@@ -579,11 +606,11 @@ class DNSInterceptor(BaseResolver):
             * DNS Packet
         """
         a_pkt = None
-        self.log.debug("SOA -> %s (Resolver: %s | Timout:%s | TCP: %s)",self.resolvers[index], index, self.resolver_timeout, str(tcp))
+        self.log.debug("SOA -> %s (Resolver: %s | Timout:%s | TCP: %s)",str(self.resolvers[index]), index, self.resolver_timeout, str(tcp))
         try:
-            a_pkt = soa_query.send(self.resolvers[index],53,tcp=tcp, timeout=self.resolver_timeout)
+            a_pkt = soa_query.send(self.resolvers[index]['ip'],self.resolvers[index]['port'],tcp=tcp, timeout=self.resolver_timeout)
         except TimeoutError:
-            self.log.error("SOA/TIMEOUT -> %s (Resolver: %s | Timout:%s)",self.resolvers[index], index, self.resolver_timeout)
+            self.log.error("SOA/TIMEOUT -> %s (Resolver: %s | Timout:%s)",str(self.resolvers[index]), index, self.resolver_timeout)
             self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         except Exception:
             self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
@@ -691,20 +718,20 @@ class DNSInterceptor(BaseResolver):
         resolver_counter = 0
         resolver_reply = False
         while (resolver_counter < len(self.resolvers)):
-            self.log.debug("%s %s -> %s", log_qu, qname, self.resolvers[resolver_counter])
+            self.log.debug("%s %s -> %s", log_qu, qname, str(self.resolvers[resolver_counter]))
             try:
                 if handler.protocol == 'udp':
-                    proxy_r = request.send(self.resolvers[resolver_counter],int(53),timeout=self.resolver_timeout)
+                    proxy_r = request.send(self.resolvers[resolver_counter]['ip'],self.resolvers[resolver_counter]['port'],timeout=self.resolver_timeout)
                 else:
-                    proxy_r = request.send(self.resolvers[resolver_counter],int(53),timeout=self.resolver_timeout,tcp=True)
+                    proxy_r = request.send(self.resolvers[resolver_counter]['ip'],self.resolvers[resolver_counter]['port'],timeout=self.resolver_timeout,tcp=True)
                 reply = DNSRecord.parse(proxy_r)
                 resolver_reply = True
             except socket.timeout:
                 reply.header.rcode = getattr(RCODE,'SERVFAIL')
-                self.log.error('TIMEOUT %s -> %s', self.resolvers[resolver_counter], qname)
+                self.log.error('TIMEOUT %s -> %s', str(self.resolvers[resolver_counter]), qname)
 
             if resolver_reply:
-                self.log.debug('%s [%s]: %s', log_ans, self.resolvers[resolver_counter], str(reply.rr))
+                self.log.debug('%s [%s]: %s', log_ans, str(self.resolvers[resolver_counter]), str(reply.rr))
                 return reply
             resolver_counter+=1
 
@@ -747,12 +774,12 @@ def bootstrap(log:logging=logging):
     connection.close() # Ok, all good, it's close.
     return status
 
-def getResolvers(log:logging=logging):
+def readResolveConf(resolvers, log:logging=logging):
     """
         Try to get DNS servers from resolve.conf
         Fall back to google+cloudflare.
     """
-    resolvers = []
+
     try:
         with open("/etc/resolv.conf", encoding='utf-8') as resolvconf:
             for line in resolvconf.readlines():
@@ -762,7 +789,28 @@ def getResolvers(log:logging=logging):
                     resolvers.append(str(ns[1]))
     except Exception:
         log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+
+    return resolvers
+
+
+def getResolvers(log:logging=logging):
+    """
+        Get Resolvers from HomeAssistant or Local
+    """
+    resolvers = []
+
+    if len(UPSTREAM_RESOLVERS) == 0:
+        resolvers = readResolveConf(resolvers, log)
+    else:
+        for r in UPSTREAM_RESOLVERS:
+            if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', r):
+                resolvers.append(r)
+            else:
+                log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', r)
+
+    if len(resolvers) == 0:
         resolvers = ["8.8.8.8", "1.1.1.1"]
+
     log.info('Using Resolvers -> %s', str(resolvers))
     return resolvers
 

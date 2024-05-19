@@ -18,14 +18,12 @@ ports:
 options:
   debug: false
   networks:
-    - 192.168.0.0/24:network
-    - 192.168.10.10:host
-    - 192.168.100.100-192.168.100.101:range
   unknown_ip_action: ignore
   detect_on_host_query: false
   soa_failure_action: ignore
   dns_blocking_mode: false
   learning_duration: 30
+  resolvers:
 schema:
   debug: bool
   networks:
@@ -35,3 +33,5 @@ schema:
   soa_failure_action: str
   dns_blocking_mode: bool
   learning_duration: int
+  resolvers:
+    - str

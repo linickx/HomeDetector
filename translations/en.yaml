@@ -5,7 +5,7 @@ configuration:
     description: Toggle on for Debug Logs
   networks:
     name: Local IoT Networks
-    description: List the Hosts, Ranges, Network (subnets) you wish to monitor DNS
+    description: List the Hosts, Ranges, Network (subnets) you wish to monitor DNS. Types can be host, network, range. e.g `192.168.0.1:host` or `192.168.1.0/24:network` or `192.168.2.1-192.168.2.2:range`
   unknown_ip_action:
     name: Unknown IP (Default) Action
     description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block
@@ -21,3 +21,6 @@ configuration:
   learning_duration:
     name: Learning Mode Duration
     description: How long should a network range learn/pass domains before alerting on anomalies
+  resolvers:
+    name: Upstream DNS Servers
+    description: If left blank, will use default. Else use `ip:port` as the format
