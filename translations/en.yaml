@@ -9,6 +9,9 @@ configuration:
   unknown_ip_action:
     name: Unknown IP (Default) Action
     description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block
+  detect_on_host_query:
+    name: Detect on Host Query
+    description: Anomonly detection is by Domain (SOA), this will detect on A/CNAME changes.
   soa_failure_action:
     name: SOA Failure Action
     description: What to do when SOA lookups fail. Default is ignore. Valid Options => ignore or block
