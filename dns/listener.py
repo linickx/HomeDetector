@@ -654,8 +654,18 @@ class DNSInterceptor(BaseResolver):
 
             self.log.debug("SHORT --> %s", a.short)
             self.log.debug("LONG --> %s", a)
-            self.log.debug("AUTHY >--> %s", a.auth)
-            result = str(a.auth[0].get_rname())
+            self.log.debug('RR: -----> %s', len(a.rr))
+            try:
+                result = str(a.auth[0].get_rname())
+                self.log.debug("AUTHY >--> %s", a.auth)
+            except IndexError:
+                self.log.debug("AUTHY >=> %s", a.auth)
+                for ab in a.rr:
+                    if QTYPE[ab.rtype] == 'SOA':
+                        self.log.debug(ab.rname)
+                        self.log.debug(QTYPE[ab.rtype])
+                        result = str(ab.rname)
+
             self.log.debug("🥰 Found Domain -> %s ", result)
         except DNSError:
             self.log.error("DNSERROR Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
