@@ -135,6 +135,102 @@ class DNSInterceptor(BaseResolver):
         self.sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
         self.sql_cursor = self.sql_connection.cursor()
 
+        if len(self.local_networks) == 0: # Process the HA Config
+            self.__loadnetworks()
+            self.log.info('%s/%s local scopes loaded.', len(self.local_networks), len(self.local_ips))
+
+    def getscope(self, scope_type, scope_ip):
+        """
+            Create netaddr scope object from Type/IP
+
+            scope_type:str  -> host | network | range
+            scope_ip:str    -> 192.168.0.1 | 192.168.1.0/24 | 192.168.2.1-192.168.2.2
+        """
+        scope = netaddr.IPSet() # <- Empty IP Set
+
+        if scope_type == 'host':
+            self.log.debug('%s is Host', scope_ip)
+            scope = netaddr.IPSet([netaddr.IPAddress(scope_ip)])
+        elif scope_type == 'network':
+            self.log.debug('%s is Network', scope_ip)
+            scope = netaddr.IPSet([netaddr.IPNetwork(scope_ip)])
+        elif scope_type == 'range':
+            self.log.debug('%s is Range', scope_ip)
+            ip_range = str(scope_ip).strip().split('-')
+            try:
+                scope = netaddr.IPSet([netaddr.IPRange(ip_range[0], ip_range[1])])
+            except Exception:
+                self.log.error("Problem Reading Range -> %s", scope_ip)
+                self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+
+        else:
+            self.log.critical('Unknown Scope type in DB -> {u}', u=scope_type)
+        return scope
+
+    def __loadnetworks(self):
+        """
+            Populate self.networks from HomeAssistant and SQL DB
+        """
+        for ha_config in self.local_ips:
+            scope_config = str(ha_config).split(':')
+
+            try:
+                scope_type = scope_config[1]
+            except IndexError:
+                self.log.warning('[ASSUMING HOST] - No IP Type (Host/Network/Range) set for %s', str(ha_config))
+                scope_type = 'host'
+
+            if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', str(scope_config[0]).strip()):
+                scope_ip = str(scope_config[0]).strip()
+            else:
+                self.log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', str(scope_config[0]).strip())
+                continue
+
+            scope = self.getscope(scope_type, scope_ip)
+            scope_id = self.create_id([scope_type, scope_ip])
+
+            try:
+                sql_rows = self.sql_cursor.execute(f'SELECT "id", "action", "created" FROM "{DB_T_NETWORKS}" WHERE id = ?', (scope_id,)).fetchall()
+            except Exception:
+                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+
+            if len(sql_rows) == 0:
+                created = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
+                action = "learn"
+                params = (
+                    scope_id,
+                    scope_ip,
+                    scope_type,
+                    action,
+                    created,
+                )
+                self.log.debug(str(params))
+                try:
+                    self.sql_cursor.execute(                       # Create a new Row
+                        f'INSERT INTO "{DB_T_NETWORKS}" ("id", "ip", "type", "action", "created") VALUES (?, ?, ?, ?, ?)',
+                        params
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            else:
+                action = sql_rows[0][1]
+                created = datetime.datetime.fromisoformat(sql_rows[0][2])
+                now = datetime.datetime.now(datetime.UTC)
+                delta = now - created
+                self.log.debug('ID: %s | Action: %s | Created: %s | %s days old', sql_rows[0], action, created, delta.days)
+
+                if delta.days >= LEARNING_DURATION and (action != "block"):
+                    action = "block"
+                    self.log.warning('🔥🔥 Learning Mode over for Scope %s Setting to detect new domains 🔥🔥', scope_id)
+                    try:
+                        self.sql_cursor.execute(   # Update the existing Row
+                            f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
+                        )
+                    except Exception:
+                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+
+            self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
+
     def learningMode(self, source_ip):
         """
             Check if Source IP is in Learning More or Not
@@ -144,88 +240,6 @@ class DNSInterceptor(BaseResolver):
 
         """
         self.log.debug("Source IP -> %s", source_ip)
-
-        if len(self.local_networks) == 0: # Process the HA Config
-
-            for ha_config in self.local_ips:
-                scope_config = str(ha_config).split(':')
-
-                try:
-                    scope_type = scope_config[1]
-                except IndexError:
-                    self.log.warning('[ASSUMING HOST] - No IP Type (Host/Network/Range) set for %s', str(ha_config))
-                    scope_type = 'host'
-
-                if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', str(scope_config[0]).strip()):
-                    scope_ip = str(scope_config[0]).strip()
-                else:
-                    self.log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', str(scope_config[0]).strip())
-                    continue
-
-                if scope_type == 'host':
-                    self.log.debug('%s is Host', scope_ip)
-                    scope = netaddr.IPSet([netaddr.IPAddress(scope_ip)])
-                elif scope_type == 'network':
-                    self.log.debug('%s is Network', scope_ip)
-                    scope = netaddr.IPSet([netaddr.IPNetwork(scope_ip)])
-                elif scope_type == 'range':
-                    self.log.debug('%s is Range', scope_ip)
-                    ip_range = str(scope_ip).strip().split('-')
-                    try:
-                        scope = netaddr.IPSet([netaddr.IPRange(ip_range[0], ip_range[1])])
-                    except Exception:
-                        self.log.error("Problem Reading Range -> %s", scope_ip)
-                        self.log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
-                        continue
-                else:
-                    self.log.critical('Unknown Scope type in DB -> {u}', u=scope_type)
-                    scope = netaddr.IPSet() # <- Empty IP Set
-
-                scope_id = self.create_id([scope_type, scope_ip])
-
-                try:
-                    sql_rows = self.sql_cursor.execute(f'SELECT "id", "action", "created" FROM "{DB_T_NETWORKS}" WHERE id = ?', (scope_id,)).fetchall()
-                except Exception:
-                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-
-                if len(sql_rows) == 0:
-                    created = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
-                    action = "learn"
-                    params = (
-                        scope_id,
-                        scope_ip,
-                        scope_type,
-                        action,
-                        created,
-                    )
-                    self.log.debug(str(params))
-                    try:
-                        self.sql_cursor.execute(                       # Create a new Row
-                            f'INSERT INTO "{DB_T_NETWORKS}" ("id", "ip", "type", "action", "created") VALUES (?, ?, ?, ?, ?)',
-                            params
-                        )
-                    except Exception:
-                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                else:
-                    action = sql_rows[0][1]
-                    created = datetime.datetime.fromisoformat(sql_rows[0][2])
-                    now = datetime.datetime.now(datetime.UTC)
-                    delta = now - created
-                    self.log.debug('ID: %s | Action: %s | Created: %s | %s days old', sql_rows[0], action, created, delta.days)
-
-                    if delta.days >= LEARNING_DURATION and (action != "block"):
-                        action = "block"
-                        self.log.warning('🔥🔥 Learning Mode over for %s Setting to detect new domains 🔥🔥', source_ip)
-                        try:
-                            self.sql_cursor.execute(   # Update the existing Row
-                                f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
-                            )
-                        except Exception:
-                            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-
-                self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
-
-            self.log.info('%s/%s local scopes loaded.', len(self.local_networks), len(self.local_ips))
 
         if len(self.local_networks) > 0:
             for scope in self.local_networks:
