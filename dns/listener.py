@@ -696,7 +696,7 @@ class DNSInterceptor(BaseResolver):
             reply.header.rcode = getattr(RCODE,'NXDOMAIN')
             return reply
         else:
-            self.log.info("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
+            self.log.debug("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
             log_qu = "❓"   # Add icons for things in learning Mode... (Question)
             log_ans = "✅"  # (Answer)
 
@@ -709,6 +709,7 @@ class DNSInterceptor(BaseResolver):
             else:
                 self.linkSQLs(str(src_ip), scope_id, str(qname), str(qtype), the_domain_id)
 
+            self.log.info("✨ %s -> %s [Type: %s] => %s", src_ip, qname, qtype, the_domain)
             if not self.passThePacket(the_domain_action):
                 self.log.warning("🔥 New Authority DOMAIN %s Detected for Request %s 🔥", the_domain, qname)
                 if the_domain_id is None:
