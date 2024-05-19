@@ -110,11 +110,11 @@ finally:
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
 DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
-DB_T_QUERIES = "query"
+DB_T_QUERIES = "queries"
 DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"src_type" TEXT, "query" TEXT, "query_type", "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)'
 DB_T_NETWORKS = "networks"
 DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
-DB_T_HOSTS = "host"
+DB_T_HOSTS = "hosts"
 DB_SCHEMA_T_HOSTS = f'CREATE TABLE "{DB_T_HOSTS}" ("ip" TEXT, "scope_id" TEXT, "name" TEXT)'
 
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
