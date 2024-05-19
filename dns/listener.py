@@ -629,7 +629,7 @@ class DNSInterceptor(BaseResolver):
             self.log.debug("LONG --> %s", a)
             self.log.debug("AUTHY >--> %s", a.auth)
             result = str(a.auth[0].get_rname())
-            self.log.info("🥰 Found Domain -> %s ", result)
+            self.log.debug("🥰 Found Domain -> %s ", result)
         except DNSError:
             self.log.error("DNSERROR Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         except Exception:
@@ -648,10 +648,10 @@ class DNSInterceptor(BaseResolver):
         qtype = QTYPE[request.q.qtype]
         src_ip = handler.client_address[0]
 
-        self.log.info("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
         learning_mode, scope_id = self.learningMode(src_ip)
 
         if scope_id is None and learning_mode: # Uknown IP Ignore
+            self.log.info("%s -> %s [Type: %s]", src_ip, qname, qtype)
             log_qu = ""
             log_ans = ""
         elif scope_id is None and not learning_mode: # Uknonw IP Block
@@ -659,6 +659,7 @@ class DNSInterceptor(BaseResolver):
             reply.header.rcode = getattr(RCODE,'NXDOMAIN')
             return reply
         else:
+            self.log.info("✨ %s -> %s [Type: %s]", src_ip, qname, qtype)
             log_qu = "❓"   # Add icons for things in learning Mode... (Question)
             log_ans = "✅"  # (Answer)
 
@@ -690,7 +691,7 @@ class DNSInterceptor(BaseResolver):
         resolver_counter = 0
         resolver_reply = False
         while (resolver_counter < len(self.resolvers)):
-            self.log.info("%s %s -> %s", log_qu, qname, self.resolvers[resolver_counter])
+            self.log.debug("%s %s -> %s", log_qu, qname, self.resolvers[resolver_counter])
             try:
                 if handler.protocol == 'udp':
                     proxy_r = request.send(self.resolvers[resolver_counter],int(53),timeout=self.resolver_timeout)
@@ -703,7 +704,7 @@ class DNSInterceptor(BaseResolver):
                 self.log.error('TIMEOUT %s -> %s', self.resolvers[resolver_counter], qname)
 
             if resolver_reply:
-                self.log.info('%s [%s]: %s', log_ans, self.resolvers[resolver_counter], str(reply.rr))
+                self.log.debug('%s [%s]: %s', log_ans, self.resolvers[resolver_counter], str(reply.rr))
                 return reply
             resolver_counter+=1
 
