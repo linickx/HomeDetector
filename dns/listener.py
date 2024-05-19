@@ -110,16 +110,19 @@ finally:
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
 DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
-DB_T_NETWORKS = "networks"
-DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
 DB_T_QUERIES = "query"
 DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"src_type" TEXT, "query" TEXT, "query_type", "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)'
+DB_T_NETWORKS = "networks"
+DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
+DB_T_HOSTS = "host"
+DB_SCHEMA_T_HOSTS = f'CREATE TABLE "{DB_T_HOSTS}" ("ip" TEXT, "scope_id" TEXT, "name" TEXT)'
 
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 DB_SCHEMA = [
     (DB_T_DOMAINS, DB_SCHEMA_T_DOMAINS),
     (DB_T_NETWORKS, DB_SCHEMA_T_NETWORKS),
-    (DB_T_QUERIES, DB_SCHEMA_T_QUERIES)
+    (DB_T_QUERIES, DB_SCHEMA_T_QUERIES),
+    (DB_T_HOSTS, DB_SCHEMA_T_HOSTS)
 ]
 
 # Initial Config vars.
@@ -137,6 +140,7 @@ class DNSInterceptor(BaseResolver):
         self.resolvers = upstream
         self.local_ips = local_ips
         self.local_networks = []
+        self.known_hosts = []
 
         self.resolver_timeout = timeout/2   # We're making 2x DNS lookups for each request
         if self.resolver_timeout == 0:      # So make our timeout half
@@ -242,6 +246,30 @@ class DNSInterceptor(BaseResolver):
 
             self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
 
+    def sqlKnownHosts(self, source_ip:str=None, scope_id:str=None):
+        """
+            Record Source IPs with their Scope ID so we can give them friendlt names later :)
+        """
+
+        try:
+            sql_rows = self.sql_cursor.execute(f'SELECT "name" FROM "{DB_T_HOSTS}" WHERE ip = ?', (source_ip,)).fetchall()
+        except Exception:
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+
+        if len(sql_rows) == 0:
+            self.log.debug('Saving %s linked to %s', source_ip, scope_id)
+            try:
+                self.sql_cursor.execute(
+                    f'INSERT INTO "{DB_T_HOSTS}" ("ip", "scope_id" ) VALUES (?, ?)', (source_ip, scope_id)
+                )
+            except Exception:
+                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+        else:
+            self.log.debug('%s is known as %s', source_ip, str(sql_rows[0][0]))
+
+        self.known_hosts.append(source_ip)
+
+
     def learningMode(self, source_ip):
         """
             Check if Source IP is in Learning More or Not
@@ -257,6 +285,9 @@ class DNSInterceptor(BaseResolver):
                 if source_ip in scope['scope']:
                     learning_mode = bool(scope['action'] == 'learn')
                     self.log.debug("Source IP -> %s (%s) -> %s (%s)", source_ip, scope['id'], scope['action'], str(learning_mode))
+
+                    if source_ip not in self.known_hosts:
+                        self.sqlKnownHosts(source_ip, scope['id'])
                     return learning_mode, scope['id']
 
         self.log.debug("Source IP -> %s -> Uknown IP Action: %s", source_ip, UKNOWN_IP_PASS)
@@ -316,7 +347,7 @@ class DNSInterceptor(BaseResolver):
         try:
             sql_rows = self.sql_cursor.execute(f'SELECT "id", "counter", "action", "domain_id" FROM "{DB_T_QUERIES}" WHERE id = ?', (query_id,)).fetchall()
         except Exception:
-            self.log.debug("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             return sql_id, sql_counter, sql_action, domain_id
 
         if len(sql_rows) == 0:
@@ -440,7 +471,7 @@ class DNSInterceptor(BaseResolver):
         try:
             sql_rows = self.sql_cursor.execute(f'SELECT "scope", "id", "counter", "action" FROM "{DB_T_DOMAINS}" WHERE domain = ? AND scope = ?', (domain,scope_id,)).fetchall()
         except Exception:
-            self.log.debug("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             return sql_id, sql_counter, sql_action
 
         if len(sql_rows) == 0:
