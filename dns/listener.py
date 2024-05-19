@@ -814,10 +814,29 @@ def getResolvers(log:logging=logging):
         resolvers = readResolveConf(resolvers, log)
     else:
         for r in UPSTREAM_RESOLVERS:
-            if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', r):
-                resolvers.append(r)
+            try:
+                port = int(r['port'])
+            except (KeyError, ValueError):
+                port = 53
+
+            if re.match(r'(?:[0-9]{1,3}\.){3}[0-9]{1,3}', r['server']):
+                resolvers.append(f"{r['server']}:{port}")
             else:
-                log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', r)
+
+                # Homeassistant Add-Ons have a name, look for them...                
+                server_env = str(r['server']).replace('-', '')
+                log.debug('Looking for %s', server_env)
+
+                try:
+                    server = os.environ[server_env]
+                except KeyError:
+                    server = None
+
+                if server is not None:
+                    log.info('Loaded %s from Env %s', server, r['server'])
+                    resolvers.append(f"{server}:{port}")
+                else:
+                    log.warning('🚨 Skipping, %s is not an IPv4 Address 🚨', r)
 
     if len(resolvers) == 0:
         resolvers = ["8.8.8.8", "1.1.1.1"]
