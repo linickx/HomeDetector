@@ -6,8 +6,12 @@ for host in $(bashio::config 'resolvers|keys'); do
     if echo "$server" | grep -q -E "^local-"; then
         addon_ip=$(dig +short local-dnscrypt-proxy)
         addon_port=$(bashio::config "resolvers[${host}].port")
-        echo "$server ($addon_port) is an Addon -> $addon_ip"
-        export "${server//"-"}"="$addon_ip"
+        if [ -n "$addon_ip" ]; then
+            echo "$server ($addon_port) is an Addon -> $addon_ip"
+            export "${server//"-"}"="$addon_ip"
+        else
+            echo "$server failed to resolve, try restarting the add-on"
+        fi
     fi
 done
 
