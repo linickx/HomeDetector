@@ -787,7 +787,7 @@ class DNSInterceptor(BaseResolver):
                     proxy_r = request.send(self.resolvers[resolver_counter]['ip'],self.resolvers[resolver_counter]['port'],timeout=self.resolver_timeout,tcp=True)
                 reply = DNSRecord.parse(proxy_r)
                 resolver_reply = True
-            except socket.timeout:
+            except (socket.timeout, AttributeError):
                 reply.header.rcode = getattr(RCODE,'SERVFAIL')
                 self.log.error('TIMEOUT %s -> %s', str(self.resolvers[resolver_counter]), qname)
 
