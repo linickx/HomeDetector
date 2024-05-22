@@ -11,6 +11,7 @@ import sqlite3
 import datetime
 import hashlib
 import traceback
+import threading
 
 logger = logging.getLogger("HomeAssistant")
 log_handler = logging.StreamHandler()
@@ -172,6 +173,7 @@ class DNSInterceptor(BaseResolver):
         if self.resolver_timeout == 0:      # So make our timeout half
             self.resolver_timeout = 1       # Add one, just in case rounding ends up a zero.
 
+        self.lock = threading.Lock()
         self.sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
         self.sql_cursor = self.sql_connection.cursor()
 
@@ -247,11 +249,12 @@ class DNSInterceptor(BaseResolver):
             scope = self.getscope(scope_type, scope_ip)
             scope_id = self.createID([scope_type, scope_ip])
 
-            try:
-                sql_rows = self.sql_cursor.execute(f'SELECT "id", "action", "created" FROM "{DB_T_NETWORKS}" WHERE id = ?', (scope_id,)).fetchall()
-            except Exception:
-                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                self.log.error(traceback.format_exc())
+            with self.lock:
+                try:
+                    sql_rows = self.sql_cursor.execute(f'SELECT "id", "action", "created" FROM "{DB_T_NETWORKS}" WHERE id = ?', (scope_id,)).fetchall()
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
 
             if len(sql_rows) == 0:
                 created = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
@@ -264,14 +267,15 @@ class DNSInterceptor(BaseResolver):
                     created,
                 )
                 self.log.debug(str(params))
-                try:
-                    self.sql_cursor.execute(                       # Create a new Row
-                        f'INSERT INTO "{DB_T_NETWORKS}" ("id", "ip", "type", "action", "created") VALUES (?, ?, ?, ?, ?)',
-                        params
-                    )
-                except Exception:
-                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                    self.log.error(traceback.format_exc())
+                with self.lock:
+                    try:
+                        self.sql_cursor.execute(                       # Create a new Row
+                            f'INSERT INTO "{DB_T_NETWORKS}" ("id", "ip", "type", "action", "created") VALUES (?, ?, ?, ?, ?)',
+                            params
+                        )
+                    except Exception:
+                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                        self.log.error(traceback.format_exc())
             else:
                 action = sql_rows[0][1]
                 created = datetime.datetime.fromisoformat(sql_rows[0][2])
@@ -282,13 +286,14 @@ class DNSInterceptor(BaseResolver):
                 if delta.days >= LEARNING_DURATION and (action != "block"):
                     action = "block"
                     self.log.warning('🔥🔥 Learning Mode over for Scope %s Setting to detect new domains 🔥🔥', scope_id)
-                    try:
-                        self.sql_cursor.execute(   # Update the existing Row
-                            f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
-                        )
-                    except Exception:
-                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                        self.log.error(traceback.format_exc())
+                    with self.lock:
+                        try:
+                            self.sql_cursor.execute(   # Update the existing Row
+                                f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
+                            )
+                        except Exception:
+                            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                            self.log.error(traceback.format_exc())
 
             self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
 
@@ -297,23 +302,24 @@ class DNSInterceptor(BaseResolver):
             Record Source IPs with their Scope ID so we can give them friendlt names later :)
         """
 
-        try:
-            sql_rows = self.sql_cursor.execute(f'SELECT "name" FROM "{DB_T_HOSTS}" WHERE ip = ?', (source_ip,)).fetchall()
-        except Exception:
-            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-            self.log.error(traceback.format_exc())
-
-        if len(sql_rows) == 0:
-            self.log.debug('Saving %s linked to %s', source_ip, scope_id)
+        with self.lock:
             try:
-                self.sql_cursor.execute(
-                    f'INSERT INTO "{DB_T_HOSTS}" ("ip", "scope_id" ) VALUES (?, ?)', (source_ip, scope_id)
-                )
+                sql_rows = self.sql_cursor.execute(f'SELECT "name" FROM "{DB_T_HOSTS}" WHERE ip = ?', (source_ip,)).fetchall()
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                 self.log.error(traceback.format_exc())
-        else:
-            self.log.debug('%s is known as %s', source_ip, str(sql_rows[0][0]))
+
+            if len(sql_rows) == 0:
+                self.log.debug('Saving %s linked to %s', source_ip, scope_id)
+                try:
+                    self.sql_cursor.execute(
+                        f'INSERT INTO "{DB_T_HOSTS}" ("ip", "scope_id" ) VALUES (?, ?)', (source_ip, scope_id)
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
+            else:
+                self.log.debug('%s is known as %s', source_ip, str(sql_rows[0][0]))
 
         self.known_hosts.append(source_ip)
 
@@ -392,12 +398,13 @@ class DNSInterceptor(BaseResolver):
         else:
             sql_action = 'block'
 
-        try:
-            sql_rows = self.sql_cursor.execute(f'SELECT "id", "counter", "action", "domain_id" FROM "{DB_T_QUERIES}" WHERE id = ?', (query_id,)).fetchall()
-        except Exception:
-            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-            self.log.error(traceback.format_exc())
-            return sql_id, sql_counter, sql_action, domain_id
+        with self.lock:
+            try:
+                sql_rows = self.sql_cursor.execute(f'SELECT "id", "counter", "action", "domain_id" FROM "{DB_T_QUERIES}" WHERE id = ?', (query_id,)).fetchall()
+            except Exception:
+                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
+                return sql_id, sql_counter, sql_action, domain_id
 
         if len(sql_rows) == 0:
             return sql_id, sql_counter, sql_action, domain_id
@@ -438,14 +445,15 @@ class DNSInterceptor(BaseResolver):
                             x['domain_id']
                         )
                 self.log.debug(str(params))
-                try:
-                    self.sql_cursor.execute(
-                        f'INSERT INTO "{DB_T_QUERIES}" ("id", "src", "src_type", "query", "query_type", "counter", "action", "last_seen", "domain_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                        params
-                    )
-                except Exception:
-                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                    self.log.error(traceback.format_exc())
+                with self.lock:
+                    try:
+                        self.sql_cursor.execute(
+                            f'INSERT INTO "{DB_T_QUERIES}" ("id", "src", "src_type", "query", "query_type", "counter", "action", "last_seen", "domain_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                            params
+                        )
+                    except Exception:
+                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                        self.log.error(traceback.format_exc())
             elif x['result'] is not None:
                 x['counter'] +=1                     # Increment the counter
                 params = (
@@ -454,13 +462,14 @@ class DNSInterceptor(BaseResolver):
                     x['id'],
                     )
                 self.log.debug(str(params))
-                try:
-                    self.sql_cursor.execute(   # Update the existing Row
-                        f'UPDATE "{DB_T_QUERIES}" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
-                    )
-                except Exception:
-                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                    self.log.error(traceback.format_exc())
+                with self.lock:
+                    try:
+                        self.sql_cursor.execute(   # Update the existing Row
+                            f'UPDATE "{DB_T_QUERIES}" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
+                        )
+                    except Exception:
+                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                        self.log.error(traceback.format_exc())
 
             try:
                 self.sql_connection.commit()
@@ -519,12 +528,13 @@ class DNSInterceptor(BaseResolver):
         sql_id = None
         sql_counter = 0
 
-        try:
-            sql_rows = self.sql_cursor.execute(f'SELECT "scope", "id", "counter", "action" FROM "{DB_T_DOMAINS}" WHERE domain = ? AND scope = ?', (domain,scope_id,)).fetchall()
-        except Exception:
-            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-            self.log.error(traceback.format_exc())
-            return sql_id, sql_counter, sql_action
+        with self.lock:
+            try:
+                sql_rows = self.sql_cursor.execute(f'SELECT "scope", "id", "counter", "action" FROM "{DB_T_DOMAINS}" WHERE domain = ? AND scope = ?', (domain,scope_id,)).fetchall()
+            except Exception:
+                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
+                return sql_id, sql_counter, sql_action
 
         if len(sql_rows) == 0:
             if learning_mode:
@@ -567,14 +577,15 @@ class DNSInterceptor(BaseResolver):
                         last_seen,
                     )
             self.log.debug(str(params))
-            try:
-                self.sql_cursor.execute(                       # Create a new Row
-                    f'INSERT INTO "{DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?)',
-                    params
-                )
-            except Exception:
-                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                self.log.error(traceback.format_exc())
+            with self.lock:
+                try:
+                    self.sql_cursor.execute(                       # Create a new Row
+                        f'INSERT INTO "{DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?)',
+                        params
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
         elif sql_id is not None:
             sql_counter +=1                     # Increment the counter
             params = (
@@ -583,13 +594,14 @@ class DNSInterceptor(BaseResolver):
                   sql_id,
                 )
             self.log.debug(str(params))
-            try:
-                self.sql_cursor.execute(   # Update the existing Row
-                    f'UPDATE "{DB_T_DOMAINS}" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
-                )
-            except Exception:
-                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                self.log.error(traceback.format_exc())
+            with self.lock:
+                try:
+                    self.sql_cursor.execute(   # Update the existing Row
+                        f'UPDATE "{DB_T_DOMAINS}" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
 
         try:
             self.sql_connection.commit()
@@ -611,13 +623,14 @@ class DNSInterceptor(BaseResolver):
 
         for sql_id in the_ids:
             self.log.debug('Updating %s with %s', sql_id, the_domain_id)
-            try:
-                self.sql_cursor.execute(   # Update the existing Row
-                    f'UPDATE "{DB_T_QUERIES}" SET "domain_id" = ? WHERE "id" = ?', (the_domain_id, sql_id)
-                )
-            except Exception:
-                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                self.log.error(traceback.format_exc())
+            with self.lock:
+                try:
+                    self.sql_cursor.execute(   # Update the existing Row
+                        f'UPDATE "{DB_T_QUERIES}" SET "domain_id" = ? WHERE "id" = ?', (the_domain_id, sql_id)
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
 
             try:
                 self.sql_connection.commit()
