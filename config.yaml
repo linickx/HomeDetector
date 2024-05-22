@@ -23,6 +23,7 @@ options:
   detect_on_host_query: false
   soa_failure_action: ignore
   dns_blocking_mode: false
+  custom_host_records: []
   debug: false
 schema:
   networks:
@@ -36,4 +37,7 @@ schema:
   detect_on_host_query: bool
   soa_failure_action: str
   dns_blocking_mode: bool
+  custom_host_records:
+    - name: str
+      address: str
   debug: bool

@@ -18,7 +18,7 @@ logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 
 try:
-    from dnslib.dns import DNSError, DNSQuestion
+    from dnslib.dns import DNSError, DNSQuestion, RR, A
     from dnslib import DNSRecord,QTYPE,RCODE
     from dnslib.server import DNSServer,BaseResolver,DNSLogger
 except ModuleNotFoundError:
@@ -95,7 +95,7 @@ LOCAL_NETWORKS = [] # LAN / IoT Network
 try:
     LOCAL_NETWORKS = options_data['networks']
 except Exception:
-    LOCAL_NETWORKS.append('127.0.0.1') # Local Host for Testing :)
+    LOCAL_NETWORKS.append({'address':'127.0.0.1', 'type':'host'}) # Local Host for Testing :)
 finally:
     logger.debug('🫥  Loading Networks => %s', str(LOCAL_NETWORKS))
 
@@ -114,6 +114,21 @@ except Exception:
     pass
 finally:
     logger.debug('🫥  Custom Resolvers => %s', str(UPSTREAM_RESOLVERS))
+
+FAKE_A_RECORDS = {} # Custom A Record DNS replies
+try:
+    custom_host_records = options_data['custom_host_records']
+except Exception:
+    custom_host_records = []
+if len(custom_host_records) > 0:
+    for host_record in custom_host_records:
+        try:
+            FAKE_A_RECORDS[host_record['name']] = host_record['address']
+        except Exception:
+            logger.error('Failed to Setup Custom Host %s', str(host_record))
+
+    logger.info('🫥  %s Custom Hosts Loaded', len(FAKE_A_RECORDS))
+    logger.debug('Custom Host Records -> %s', str(FAKE_A_RECORDS))
 
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
@@ -685,6 +700,12 @@ class DNSInterceptor(BaseResolver):
         qtype = QTYPE[request.q.qtype]
         src_ip = handler.client_address[0]
 
+        the_host = str(qname).strip('.')    # Return our custom responses early
+        if the_host in FAKE_A_RECORDS:
+            self.log.info("👻 %s -> %s [FAKE] -> %s", src_ip, the_host, FAKE_A_RECORDS[the_host])
+            reply.add_answer(RR(the_host,QTYPE.A,rdata=A(FAKE_A_RECORDS[the_host]),ttl=60))
+            return reply
+
         learning_mode, scope_id = self.learningMode(src_ip)
 
         if scope_id is None and learning_mode: # Uknown IP Ignore
@@ -725,6 +746,7 @@ class DNSInterceptor(BaseResolver):
                     self.log.info("🔥🔥 QUERY BLOCKED %s 🔥🔥", the_domain)
                     reply.header.rcode = getattr(RCODE,'NXDOMAIN')
                     return reply
+
 
         resolver_counter = 0
         resolver_reply = False
@@ -823,7 +845,7 @@ def getResolvers(log:logging=logging):
                 resolvers.append(f"{r['server']}:{port}")
             else:
 
-                # Homeassistant Add-Ons have a name, look for them...                
+                # Homeassistant Add-Ons have a name, look for them...
                 server_env = str(r['server']).replace('-', '')
                 log.debug('Looking for %s', server_env)
 

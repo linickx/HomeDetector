@@ -8,19 +8,22 @@ configuration:
     description: If left blank, will use default.
   learning_duration:
     name: Learning Mode Duration
-    description: How long should a network range learn/pass domains before alerting on anomalies
+    description: How long should a network range learn/pass domains before alerting on anomalies.
   unknown_ip_action:
     name: Unknown IP (Default) Action
-    description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block
+    description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block.
   detect_on_host_query:
     name: Detect on Host Query
     description: Anomonly detection is by Domain (SOA), this will detect on A/CNAME changes.
   soa_failure_action:
     name: SOA Failure Action
-    description: What to do when SOA lookups fail. Default is ignore. Valid Options => ignore or block
+    description: What to do when SOA lookups fail. Default is ignore. Valid Options => ignore or block.
   dns_blocking_mode:
     name: DNS Blocking (FW)
     description: Block for unusual requests. Default is disabled.
+  custom_host_records:
+    name: Custom DNS Host Reords (A)
+    description: A list of names (with IPs) which by-pass DNS and are returned directly by Home Detector
   debug:
     name: Debug Mode
     description: Toggle on for Debug Logs
