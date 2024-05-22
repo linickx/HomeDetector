@@ -136,7 +136,7 @@ if len(custom_host_records) > 0:
 DB_T_DOMAINS = "domains"
 DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
 DB_T_QUERIES = "queries"
-DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"src_type" TEXT, "query" TEXT, "query_type", "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)'
+DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"scope_id" TEXT, "query" TEXT, "query_type", "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)'
 DB_T_NETWORKS = "networks"
 DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
 DB_T_HOSTS = "hosts"
@@ -420,7 +420,7 @@ class DNSInterceptor(BaseResolver):
         self.log.debug('ID: %s => %s (%s)', sql_id, sql_action, sql_counter )
         return sql_id, sql_counter, sql_action, domain_id
 
-    def sqlDNSquery(self, sql_data:list):
+    def sqlDNSquery(self, x:dict):
         """
             ## Update the SQL DNS for DNS Queries
             ### Input:
@@ -431,54 +431,53 @@ class DNSInterceptor(BaseResolver):
         sql_id = None     # < Defaults for return later...
         sql_action = 'pass'
 
-        for x in sql_data:
-            if x['result'] is None and (x['action'] in ["pass" , "block"]):
-                params = (
-                            x['id'],
-                            x['src'],
-                            x['src_type'],
-                            x['query'],
-                            x['query_type'],
-                            x['counter'],
-                            x['action'],
-                            x['last_seen'],
-                            x['domain_id']
-                        )
-                self.log.debug(str(params))
-                with self.lock:
-                    try:
-                        self.sql_cursor.execute(
-                            f'INSERT INTO "{DB_T_QUERIES}" ("id", "src", "src_type", "query", "query_type", "counter", "action", "last_seen", "domain_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                            params
-                        )
-                    except Exception:
-                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                        self.log.error(traceback.format_exc())
-            elif x['result'] is not None:
-                x['counter'] +=1                     # Increment the counter
-                params = (
-                    x['counter'],
-                    x['last_seen'],
-                    x['id'],
+
+        if x['result'] is None and (x['action'] in ["pass" , "block"]):
+            params = (
+                        x['id'],
+                        x['src'],
+                        x['scope_id'],
+                        x['query'],
+                        x['query_type'],
+                        x['counter'],
+                        x['action'],
+                        x['last_seen'],
+                        x['domain_id']
                     )
-                self.log.debug(str(params))
-                with self.lock:
-                    try:
-                        self.sql_cursor.execute(   # Update the existing Row
-                            f'UPDATE "{DB_T_QUERIES}" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
-                        )
-                    except Exception:
-                        self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                        self.log.error(traceback.format_exc())
+            self.log.debug(str(params))
+            with self.lock:
+                try:
+                    self.sql_cursor.execute(
+                        f'INSERT INTO "{DB_T_QUERIES}" ("id", "src", "scope_id", "query", "query_type", "counter", "action", "last_seen", "domain_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        params
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
+        elif x['result'] is not None:
+            x['counter'] +=1                     # Increment the counter
+            params = (
+                x['counter'],
+                x['last_seen'],
+                x['id'],
+                )
+            self.log.debug(str(params))
+            with self.lock:
+                try:
+                    self.sql_cursor.execute(   # Update the existing Row
+                        f'UPDATE "{DB_T_QUERIES}" SET "counter" = ?, "last_seen" = ? WHERE "id" = ?', params
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
 
-            try:
-                self.sql_connection.commit()
-            except Exception:
-                self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+        try:
+            self.sql_connection.commit()
+        except Exception:
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
 
-            if x['src_type'] == "scope":
-                sql_id = x['id']
-                sql_action = x['action']
+        sql_id = x['id']
+        sql_action = x['action']
 
         return sql_id, sql_action
 
@@ -494,24 +493,17 @@ class DNSInterceptor(BaseResolver):
             ### Return:
             * `tuple` (id:str=None, action:str='pass')
         """
-        host_query_id = self.createID([source_ip, 'host', query_name, query_type])
+        host_query_id = self.createID([source_ip, query_name, query_type])
         self.log.debug('[HOST] => SQLID: %s | Src IP: %s | Qname: %s | Qtype: %s', host_query_id, source_ip, query_name, query_type )
+
         r_host_query_id, host_counter, host_action, host_domain_id = self.findSQLQueryID(host_query_id, learning_mode)
         self.log.debug('[HOST] => SQL ID: %s | Counter: %s | Action: %s', r_host_query_id, host_counter, host_action)
 
-        scope_query_id = self.createID([scope_id, 'scope', query_name, query_type])
-        self.log.debug('[SCOPE] => SQLID: %s | Scope: %s | Qname: %s | Qtype: %s', scope_query_id, scope_id, query_name, query_type )
-        r_scope_query_id, scope_counter, scope_sction, query_domain_id = self.findSQLQueryID(scope_query_id, learning_mode)
-        self.log.debug('[SCOPE] => SQL ID: %s | Counter: %s | Action: %s', r_scope_query_id, scope_counter, scope_sction)
-
         last_seen = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
 
-        sql_things_to_do = [
-            {'result': r_host_query_id, 'id': host_query_id, 'counter': host_counter, 'action': host_action, 'src_type':'host', 'src':source_ip, 'query':query_name, 'query_type':query_type, 'last_seen':last_seen, 'domain_id': host_domain_id},
-            {'result': r_scope_query_id, 'id': scope_query_id, 'counter': scope_counter, 'action': scope_sction, 'src_type':'scope', 'src':scope_id, 'query':query_name, 'query_type':query_type, 'last_seen':last_seen, 'domain_id': query_domain_id},
-        ]
-
-        sql_id, sql_action = self.sqlDNSquery(sql_things_to_do)
+        sql_id, sql_action = self.sqlDNSquery(
+            {'result': r_host_query_id, 'id': host_query_id, 'counter': host_counter, 'action': host_action, 'scope_id':scope_id, 'src':source_ip, 'query':query_name, 'query_type':query_type, 'last_seen':last_seen, 'domain_id': host_domain_id}
+        )
         return sql_id, sql_action
 
     def findSQLDomainID(self, domain:str=None, scope_id:str=None, sql_action:str=None, learning_mode:bool=True):
@@ -616,27 +608,23 @@ class DNSInterceptor(BaseResolver):
             Link a Query to a Domain
         """
         self.log.debug('%s (%s) -> %s (%s) => %s', source_ip, scope_id, query_name, query_type, the_domain_id)
-        the_ids = [
-            self.createID([source_ip, 'host', query_name, query_type]),
-            self.createID([scope_id, 'scope', query_name, query_type])
-        ]
 
-        for sql_id in the_ids:
-            self.log.debug('Updating %s with %s', sql_id, the_domain_id)
-            with self.lock:
-                try:
-                    self.sql_cursor.execute(   # Update the existing Row
-                        f'UPDATE "{DB_T_QUERIES}" SET "domain_id" = ? WHERE "id" = ?', (the_domain_id, sql_id)
-                    )
-                except Exception:
-                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                    self.log.error(traceback.format_exc())
-
+        sql_id = self.createID([source_ip, query_name, query_type])
+        self.log.debug('Updating %s with %s', sql_id, the_domain_id)
+        with self.lock:
             try:
-                self.sql_connection.commit()
+                self.sql_cursor.execute(   # Update the existing Row
+                    f'UPDATE "{DB_T_QUERIES}" SET "domain_id" = ? WHERE "id" = ?', (the_domain_id, sql_id)
+                )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                 self.log.error(traceback.format_exc())
+
+        try:
+            self.sql_connection.commit()
+        except Exception:
+            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error(traceback.format_exc())
 
     def sendSOArequest(self, soa_query:DNSRecord, index:int=0, tcp:bool=False):
         """
