@@ -10,6 +10,7 @@ import re
 import sqlite3
 import datetime
 import hashlib
+import traceback
 
 logger = logging.getLogger("HomeAssistant")
 log_handler = logging.StreamHandler()
@@ -250,6 +251,7 @@ class DNSInterceptor(BaseResolver):
                 sql_rows = self.sql_cursor.execute(f'SELECT "id", "action", "created" FROM "{DB_T_NETWORKS}" WHERE id = ?', (scope_id,)).fetchall()
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
 
             if len(sql_rows) == 0:
                 created = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
@@ -269,6 +271,7 @@ class DNSInterceptor(BaseResolver):
                     )
                 except Exception:
                     self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
             else:
                 action = sql_rows[0][1]
                 created = datetime.datetime.fromisoformat(sql_rows[0][2])
@@ -285,6 +288,7 @@ class DNSInterceptor(BaseResolver):
                         )
                     except Exception:
                         self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                        self.log.error(traceback.format_exc())
 
             self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
 
@@ -297,6 +301,7 @@ class DNSInterceptor(BaseResolver):
             sql_rows = self.sql_cursor.execute(f'SELECT "name" FROM "{DB_T_HOSTS}" WHERE ip = ?', (source_ip,)).fetchall()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error(traceback.format_exc())
 
         if len(sql_rows) == 0:
             self.log.debug('Saving %s linked to %s', source_ip, scope_id)
@@ -306,6 +311,7 @@ class DNSInterceptor(BaseResolver):
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
         else:
             self.log.debug('%s is known as %s', source_ip, str(sql_rows[0][0]))
 
@@ -390,6 +396,7 @@ class DNSInterceptor(BaseResolver):
             sql_rows = self.sql_cursor.execute(f'SELECT "id", "counter", "action", "domain_id" FROM "{DB_T_QUERIES}" WHERE id = ?', (query_id,)).fetchall()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error(traceback.format_exc())
             return sql_id, sql_counter, sql_action, domain_id
 
         if len(sql_rows) == 0:
@@ -438,6 +445,7 @@ class DNSInterceptor(BaseResolver):
                     )
                 except Exception:
                     self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
             elif x['result'] is not None:
                 x['counter'] +=1                     # Increment the counter
                 params = (
@@ -452,6 +460,7 @@ class DNSInterceptor(BaseResolver):
                     )
                 except Exception:
                     self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
 
             try:
                 self.sql_connection.commit()
@@ -514,6 +523,7 @@ class DNSInterceptor(BaseResolver):
             sql_rows = self.sql_cursor.execute(f'SELECT "scope", "id", "counter", "action" FROM "{DB_T_DOMAINS}" WHERE domain = ? AND scope = ?', (domain,scope_id,)).fetchall()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error(traceback.format_exc())
             return sql_id, sql_counter, sql_action
 
         if len(sql_rows) == 0:
@@ -564,6 +574,7 @@ class DNSInterceptor(BaseResolver):
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
         elif sql_id is not None:
             sql_counter +=1                     # Increment the counter
             params = (
@@ -578,11 +589,13 @@ class DNSInterceptor(BaseResolver):
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
 
         try:
             self.sql_connection.commit()
         except Exception:
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            self.log.error(traceback.format_exc())
 
         return sql_action, sql_id
 
@@ -604,11 +617,13 @@ class DNSInterceptor(BaseResolver):
                 )
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
 
             try:
                 self.sql_connection.commit()
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                self.log.error(traceback.format_exc())
 
     def sendSOArequest(self, soa_query:DNSRecord, index:int=0, tcp:bool=False):
         """
@@ -799,6 +814,7 @@ def bootstrap(log:logging=logging):
                 status = False
         except Exception:
             log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+            log.error(traceback.format_exc())
             status = False
         else:
             log.info('DB %s SCHEMA Created', table[0])
