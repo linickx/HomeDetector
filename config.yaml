@@ -18,6 +18,10 @@ ports:
   23/tcp:
   21/tcp:
   80/tcp:
+ingress: true
+ingress_entry: admin
+panel_icon: mdi:incognito
+panel_admin: true
 options:
   networks: []
   resolvers: []

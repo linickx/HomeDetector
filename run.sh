@@ -17,5 +17,7 @@ done
 
 echo "Starting the HoneyPot (OpenCanary)..."
 opencanaryd --start
+echo "Starting the Admin Web Server..."
+python3 /app/web.py &
 echo "Starting the DNS Listener..."
-python3 /listener.py
+python3 /app/listener.py
