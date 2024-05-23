@@ -140,7 +140,7 @@ DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"sc
 DB_T_NETWORKS = "networks"
 DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
 DB_T_HOSTS = "hosts"
-DB_SCHEMA_T_HOSTS = f'CREATE TABLE "{DB_T_HOSTS}" ("ip" TEXT, "scope_id" TEXT, "name" TEXT)'
+DB_SCHEMA_T_HOSTS = f'CREATE TABLE "{DB_T_HOSTS}" ("id" TEXT, "ip" TEXT, "scope_id" TEXT, "name" TEXT)'
 
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 DB_SCHEMA = [
@@ -309,17 +309,19 @@ class DNSInterceptor(BaseResolver):
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                 self.log.error(traceback.format_exc())
 
-            if len(sql_rows) == 0:
-                self.log.debug('Saving %s linked to %s', source_ip, scope_id)
+        if len(sql_rows) == 0:
+            source_id = self.createID([source_ip])
+            self.log.debug('Saving %s linked to %s', source_ip, scope_id)
+            with self.lock:
                 try:
                     self.sql_cursor.execute(
-                        f'INSERT INTO "{DB_T_HOSTS}" ("ip", "scope_id" ) VALUES (?, ?)', (source_ip, scope_id)
+                        f'INSERT INTO "{DB_T_HOSTS}" ("id", "ip", "scope_id" ) VALUES (?, ?, ?)', (source_id, source_ip, scope_id)
                     )
                 except Exception:
                     self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                     self.log.error(traceback.format_exc())
-            else:
-                self.log.debug('%s is known as %s', source_ip, str(sql_rows[0][0]))
+        else:
+            self.log.debug('%s is known as %s', source_ip, str(sql_rows[0][0]))
 
         self.known_hosts.append(source_ip)
 
