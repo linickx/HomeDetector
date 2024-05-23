@@ -8,4 +8,4 @@ A lightweight intrusion detector.
 
 ## Honeypot
 
-🫥🫥 TODO 🫥🫥
+👷👷 Work in Progress 👷👷

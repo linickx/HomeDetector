@@ -27,3 +27,9 @@ configuration:
   debug:
     name: Debug Mode
     description: Toggle on for Debug Logs
+network:
+  10053/tcp: DNS Listener/Local Resolver Port (TCP)
+  10053/udp: DNS Listener/Local Resolver Port (UDP)
+  23/tcp: HoneyPot Telnet Port
+  21/tcp: HoneyPot FTP Port
+  80/tcp: HoneyPot (Fake) WebServer Port

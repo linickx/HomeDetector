@@ -15,5 +15,7 @@ for host in $(bashio::config 'resolvers|keys'); do
     fi
 done
 
+echo "Starting the HoneyPot (OpenCanary)..."
+opencanaryd --start
 echo "Starting the DNS Listener..."
 python3 /listener.py

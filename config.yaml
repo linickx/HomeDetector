@@ -13,8 +13,11 @@ startup: services
 map:
   - share:rw
 ports:
-  10053/tcp: 10053
-  10053/udp: 10053
+  10053/tcp: 53
+  10053/udp: 53
+  23/tcp:
+  21/tcp:
+  80/tcp:
 options:
   networks: []
   resolvers: []
