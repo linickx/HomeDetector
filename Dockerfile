@@ -16,7 +16,7 @@ RUN mkdir /app/
 RUN mkdir /app/static
 
 # App Dependencies
-COPY opencanary/default.conf /etc/opencanaryd/opencanary.conf
+COPY opencanary/opencanary.conf /etc/opencanaryd/opencanary.conf
 COPY admin/static/* /app/static/
 
 # My custom python apps...
