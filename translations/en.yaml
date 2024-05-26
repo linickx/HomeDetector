@@ -9,6 +9,9 @@ configuration:
   learning_duration:
     name: Learning Mode Duration
     description: How long should a network range learn/pass domains before alerting on anomalies.
+  ha_webhook_id:
+    name: Webhook ID
+    description: Home Assistant Web Hook ID for upstream automations/alerts/notifications
   unknown_ip_action:
     name: Unknown IP (Default) Action
     description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block.

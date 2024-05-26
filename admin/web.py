@@ -53,11 +53,18 @@ finally:
 
 HA_WEBHOOK = None
 try:
-    HA_WEBHOOK = OPTIONS_DATA['webhook_id']
+    HA_WEBHOOK = OPTIONS_DATA['ha_webhook_id']
 except Exception:
     pass
 else:
     logger.info('💌  Home Assistant WebHook ID => %s', HA_WEBHOOK)
+
+if HA_WEBHOOK is not None:
+    try:
+        import requests
+    except ModuleNotFoundError:
+        logger.critical('Disabling Webhook, requests is missing')
+        HA_WEBHOOK = None
 
 # Initial Config vars.
 if os.path.exists("/share/"):           # <- Revert addon_configs when done.
@@ -116,14 +123,6 @@ class Webhook(Resource):
         hex_dig = hash_object.hexdigest()
         return str(hex_dig)
 
-    def post_to_ha(self, data:dict=None, webhook_id:str=HA_WEBHOOK):
-        """
-            Post data to Home Assistant WebHook
-        """
-        logger.debug('Sending %s to %s', str(data), webhook_id)
-        status = False
-        return status
-
     def __sqlSave(self, alert:dict=None):
         """
             Insert into DB
@@ -156,7 +155,7 @@ class Webhook(Resource):
                 logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
 
         if HA_WEBHOOK is not None:
-            if not self.post_to_ha(alert):
+            if not post_to_ha(alert):
                 logger.warning('Sending Alert to Webhook Failed.')
         return status
 
@@ -313,6 +312,44 @@ def bootstrap():
     connection.commit()
     connection.close() # Ok, all good, it's close.
     return status
+
+def post_to_ha(data:dict=None, webhook_id:str=HA_WEBHOOK):
+    """
+        Post data to Home Assistant WebHook
+    """
+    url = f'http://supervisor/core/api/webhook/{webhook_id}'
+    logger.debug('Sending %s to %s', str(data), url)
+    status = False
+    headers = {}
+
+    try:
+        token = os.environ['SUPERVISOR_TOKEN']
+    except Exception:
+        logger.error('Failed to Read Home Assistant Auth Token')
+    else:
+        headers['Authorization'] = f"Bearer {token}"
+
+    try:
+        r = requests.post(json=data, url=url, headers=headers, timeout=30)
+    except Exception:
+        logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+        logger.error(traceback.format_exc())
+        status_code = 1000
+    else:
+        status_code = r.status_code
+
+    logger.debug('Hook Status Code: %s', status_code)
+    if status_code == 200:
+        status = True
+
+    if DEBUG_MODE:
+        try:
+            logger.info("Hook Content -> %s", str(r.content))
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+
+    return status
+
 
 if __name__ == "__main__":
     if not bootstrap():

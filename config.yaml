@@ -23,10 +23,12 @@ ingress: true
 ingress_entry: admin
 panel_icon: mdi:incognito
 panel_admin: true
+homeassistant_api: true
 options:
   networks: []
   resolvers: []
   learning_duration: 30
+  ha_webhook_id:
   unknown_ip_action: ignore
   detect_on_host_query: false
   soa_failure_action: ignore
@@ -41,6 +43,7 @@ schema:
     - server: str
       port: int
   learning_duration: int
+  ha_webhook_id: str
   unknown_ip_action: str
   detect_on_host_query: bool
   soa_failure_action: str
