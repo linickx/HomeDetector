@@ -1,5 +1,9 @@
 # Custom Project Ignores
-dns.db*
+*.db*
+
+# Opencanry
+twistd.pid
+opencanary.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
