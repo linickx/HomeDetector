@@ -41,14 +41,15 @@ except Exception:
     logger.info('🚨🚨 Unable to -> FIND <- Home Assistant Options, will use DEFAULTS 🚨🚨')
 else:
     try:
-        options_data = json.loads(options_f)
+        OPTIONS_DATA = json.loads(options_f)
     except Exception:
         logger.error('🚨🚨 Unable to ==> LOAD <== Home Assistant Options, will use DEFAULTS 🚨🚨')
         logger.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+        OPTIONS_DATA = {}
 
 DEBUG_MODE = False      # Default => INFO
 try:
-    DEBUG_MODE = bool(options_data['debug'])
+    DEBUG_MODE = bool(OPTIONS_DATA['debug'])
 except Exception:
     pass
 finally:
@@ -56,13 +57,12 @@ finally:
     if DEBUG_MODE:
         logger.setLevel(logging.DEBUG)
 
-
 UKNOWN_IP_PASS = True # Should default IPs learn? (True => Yes, False => Block)
 try:
-    if options_data['unknown_ip_action'] in ['ignore', 'block']:
-        if options_data['unknown_ip_action'] == 'ignore':
+    if OPTIONS_DATA['unknown_ip_action'] in ['ignore', 'block']:
+        if OPTIONS_DATA['unknown_ip_action'] == 'ignore':
             UKNOWN_IP_PASS = True
-        if options_data['unknown_ip_action'] == 'block':
+        if OPTIONS_DATA['unknown_ip_action'] == 'block':
             UKNOWN_IP_PASS = False
 except Exception:
     pass
@@ -70,8 +70,8 @@ logger.info('🫥  unknown_ip_action => %s',  UKNOWN_IP_PASS)
 
 SOA_FAIL_ACTION = "ignore" # what to do if SOA lookup fails.
 try:
-    if options_data['soa_failure_action'] in ['ignore', 'block']:
-        SOA_FAIL_ACTION = options_data['soa_failure_action']
+    if OPTIONS_DATA['soa_failure_action'] in ['ignore', 'block']:
+        SOA_FAIL_ACTION = OPTIONS_DATA['soa_failure_action']
 except Exception:
     pass
 finally:
@@ -79,7 +79,7 @@ finally:
 
 DNS_DETECT_ON_HOST = False      # Default => Detect on Domain (SOA) Changes
 try:
-    DNS_DETECT_ON_HOST = bool(options_data['detect_on_host_query'])
+    DNS_DETECT_ON_HOST = bool(OPTIONS_DATA['detect_on_host_query'])
 except Exception:
     pass
 finally:
@@ -87,7 +87,7 @@ finally:
 
 DNS_FIREWALL_ON = False      # Default => notify (detect) mode only
 try:
-    DNS_FIREWALL_ON = bool(options_data['dns_blocking_mode'])
+    DNS_FIREWALL_ON = bool(OPTIONS_DATA['dns_blocking_mode'])
 except Exception:
     pass
 finally:
@@ -95,7 +95,7 @@ finally:
 
 LOCAL_NETWORKS = [] # LAN / IoT Network
 try:
-    LOCAL_NETWORKS = options_data['networks']
+    LOCAL_NETWORKS = OPTIONS_DATA['networks']
 except Exception:
     LOCAL_NETWORKS.append({'address':'127.0.0.1', 'type':'host'}) # Local Host for Testing :)
 finally:
@@ -103,7 +103,7 @@ finally:
 
 LEARNING_DURATION = 30
 try:
-    LEARNING_DURATION = int(options_data['learning_duration'])
+    LEARNING_DURATION = int(OPTIONS_DATA['learning_duration'])
 except Exception:
     pass
 finally:
@@ -111,7 +111,7 @@ finally:
 
 UPSTREAM_RESOLVERS = [] # DNS Servers
 try:
-    UPSTREAM_RESOLVERS = options_data['resolvers']
+    UPSTREAM_RESOLVERS = OPTIONS_DATA['resolvers']
 except Exception:
     pass
 finally:
@@ -119,7 +119,7 @@ finally:
 
 FAKE_A_RECORDS = {} # Custom A Record DNS replies
 try:
-    custom_host_records = options_data['custom_host_records']
+    custom_host_records = OPTIONS_DATA['custom_host_records']
 except Exception:
     custom_host_records = []
 if len(custom_host_records) > 0:
