@@ -60,12 +60,12 @@ else:
     logger.info('💌  Home Assistant WebHook ID => %s', HA_WEBHOOK)
 
 # Initial Config vars.
-if os.path.exists("/addon_configs/"):
-    CONFIG_DB_PATH = "/addon_configs/"
+if os.path.exists("/share/"):           # <- Revert addon_configs when done.
+    CONFIG_DB_PATH = "/share/"
 else:
     CONFIG_DB_PATH = "./"               # Make config option
 
-CONFIG_DB_NAME = "hd.alerts.db"        # Later, this should be user config
+CONFIG_DB_NAME = "alerts.db"        # Later, this should be user config
 
 DB_T_ALERTS = "alerts"
 DB_SCHEMA_T_ALERTS = f'CREATE TABLE "{DB_T_ALERTS}" ("id" TEXT, "timestamp" TEXT, "type" TEXT, "src_ip" TEXT, "message" TEXT)'

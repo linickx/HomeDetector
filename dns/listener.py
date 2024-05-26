@@ -151,7 +151,7 @@ DB_SCHEMA = [
 ]
 
 # Initial Config vars.
-if os.path.exists("/share/"):
+if os.path.exists("/share/"):           # <- Should be addon_configs .
     CONFIG_DB_PATH = "/share/"
 else:
     CONFIG_DB_PATH = "./"               # Make config option
