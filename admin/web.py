@@ -131,7 +131,7 @@ class WebRoot(Resource):
 
 class AdminPage(Resource):
     def render_GET(self, request):
-        host_url = get_host_url(request.URLPath(), "admin")
+        host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('admin.j2')
         output = admin_template.render(title="Alerts", active="alerts", haurl=host_url)
         return (
@@ -141,14 +141,14 @@ class AdminPage(Resource):
 
 class DNSPage(Resource):
     def render_GET(self, request):
-        host_url = get_host_url(request.URLPath(), "admin")
+        host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('dns.j2')
         output = admin_template.render(title="DNS", active="dns", haurl=host_url)
         return (output.encode('utf-8'))
 
 class TuningPage(Resource):
     def render_GET(self, request):
-        host_url = get_host_url(request.URLPath(), "admin")
+        host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('tuning.j2')
         output = admin_template.render(title="Tuning", active="tuning", haurl=host_url)
         return (output.encode('utf-8'))
@@ -156,10 +156,10 @@ class TuningPage(Resource):
 class AdminRoot(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         path_str = path.decode('utf-8')
-        logger.info(path_str)
+        logger.debug("Admin Path -> %s", path_str)
         if path_str == "dns":
             return DNSPage()
-        elif path_str == "tuning":
+        if path_str == "tuning":
             return TuningPage()
 
         # Default
@@ -420,15 +420,20 @@ def post_to_ha(data:dict=None, webhook_id:str=HA_WEBHOOK):
 
     return status
 
-def get_host_url(urlpath, path):
-    urlpath = str(urlpath)
-    reggy = re.match(r"(.*)\/("+ path + r"\/?)", urlpath)
-    logger.debug(reggy)
-    if not reggy:
-        return ""
-    host_url = reggy[1]
-    logger.debug("%s on %s", path, host_url)
-    return host_url + "/"
+def get_host_url(request, path=None):
+    """
+        Try to suss-out the Absolute URL for Statics
+    """
+    if request.getHeader('X-Ingress-Path') is None: # <- Home Assistant Ingress
+        urlpath = str(request.URLPath())            # <- Everything else
+        reggy = re.match(r"(.*)\/("+ path + r"\/?)", urlpath)
+        logger.debug(reggy)
+        if not reggy:
+            return ""
+        host_url = reggy[1]
+        logger.debug("%s on %s", path, host_url)
+        return host_url + "/"
+    return str(request.getHeader('X-Ingress-Path')) + "/"
 
 
 # Main!
