@@ -130,15 +130,44 @@ class WebRoot(Resource):
         return WebRootPage()
 
 class AdminPage(Resource):
-    isLeaf = True
     def render_GET(self, request):
-        logger.debug('request.path -> %s', request.path)
+        host_url = get_host_url(request.URLPath(), "admin")
         admin_template = J2_ENV.get_template('admin.j2')
-        output = admin_template.render()
+        output = admin_template.render(title="Alerts", active="alerts", haurl=host_url)
         return (
             #b"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Home Detector Administration</title></head><body>Admin</body></html>"
             output.encode('utf-8')
             )
+
+class DNSPage(Resource):
+    def render_GET(self, request):
+        host_url = get_host_url(request.URLPath(), "admin")
+        admin_template = J2_ENV.get_template('dns.j2')
+        output = admin_template.render(title="DNS", active="dns", haurl=host_url)
+        return (output.encode('utf-8'))
+
+class TuningPage(Resource):
+    def render_GET(self, request):
+        host_url = get_host_url(request.URLPath(), "admin")
+        admin_template = J2_ENV.get_template('tuning.j2')
+        output = admin_template.render(title="Tuning", active="tuning", haurl=host_url)
+        return (output.encode('utf-8'))
+
+class AdminRoot(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        path_str = path.decode('utf-8')
+        logger.info(path_str)
+        if path_str == "dns":
+            return DNSPage()
+        elif path_str == "tuning":
+            return TuningPage()
+
+        # Default
+        return AdminPage()
+
+    def render_GET(self, request):
+        # no child.
+        return AdminPage().render_GET(request)
 
 class Webhook(Resource):
     """
@@ -391,6 +420,17 @@ def post_to_ha(data:dict=None, webhook_id:str=HA_WEBHOOK):
 
     return status
 
+def get_host_url(urlpath, path):
+    urlpath = str(urlpath)
+    reggy = re.match(r"(.*)\/("+ path + r"\/?)", urlpath)
+    logger.debug(reggy)
+    if not reggy:
+        return ""
+    host_url = reggy[1]
+    logger.debug("%s on %s", path, host_url)
+    return host_url + "/"
+
+
 # Main!
 if __name__ == "__main__":
     if not bootstrap():
@@ -403,7 +443,7 @@ if __name__ == "__main__":
 
     root = WebRoot()
     root.putChild(b"static", File(STATIC_FILES))
-    root.putChild(b"admin", AdminPage())
+    root.putChild(b"admin", AdminRoot())
     root.putChild(b"notify", Webhook())
     factory = Site(root)
     endpoint = endpoints.TCP4ServerEndpoint(reactor, 8099)

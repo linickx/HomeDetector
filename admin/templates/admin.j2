@@ -1,10 +1,20 @@
 {% extends 'base.j2' %}
 
-{% block title%}Home Detector -> Administration {% endblock %}
-
 {% block content %}
-<h1>Admin Page</h1>
-<p>
-    This is the admin page
-</p>
+<table
+  id="table"
+  data-toggle="table"
+  data-url=""
+  data-height="400"
+  data-side-pagination="server"
+  data-pagination="true">
+  <thead>
+    <tr>
+      <th data-field="timestamp">Timestamp</th>
+      <th data-field="type">Type</th>
+      <th data-field="src_ip">Source IP</th>
+      <th data-field="message">Message</th>
+    </tr>
+  </thead>
+</table>
 {% endblock %}

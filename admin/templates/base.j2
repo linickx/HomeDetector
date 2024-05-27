@@ -3,10 +3,35 @@
     <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
     <link href='{{ haurl }}static/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>
     <script src='{{ haurl }}static/bootstrap-auto-dark-mode.js'></script>
-    <title>{% block title %}{% endblock %}</title>
+    <title>Home Detector -> {{title}}</title>
 </head>
 <body>
-    {% block content%}
-    {% endblock %}
+<main>
+    <div class="container py-3">
+        <div class="row text-center">
+            <h1 class="display-1">{{title}}</h1>
+        </div>
+        <hr />
+        <div class="row py-3">
+            <div class="col-8">&nbsp;</div>
+            <div class="col-4">
+                <div class="btn-group" role="group" aria-current="page">
+                <a href="{{ haurl}}admin" type="button" class="btn btn-outline-primary {% if active == "alerts" %}active{% endif %}">Alerts</a>
+                <a href="{{ haurl}}admin/dns" type="button" class="btn btn-outline-primary {% if active == "dns" %}active{% endif %}">DNS</a>
+                <a href="{{ haurl}}admin/tuning" type="button" class="btn btn-outline-primary {% if active == "tuning" %}active{% endif %}">Tuning</a>
+                </div>
+            </div>
+        </div>
+        <div class="row py-3">
+        {% block content%}
+        {% endblock %}
+        </div>
+    </div>
+</main>
+<footer class="footer fixed-bottom py-2">
+<div class="container text-end">
+<span class="text-body-secondary">NB</span>
+</div>
+</footer>
 </body>
 </html>
