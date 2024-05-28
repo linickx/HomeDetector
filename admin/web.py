@@ -352,13 +352,32 @@ class Webhook(Resource):
 
         record_id = self.createID([timestamp, alert_type, src_ip])
 
-        if alert['honeycred']:
-            poos_like_honey = "Honey "
-        else:
-            poos_like_honey = ""
+        poos_like_honey = ""
+        try:
+            if alert['honeycred']:
+                poos_like_honey = "Honey "
+        except KeyError:
+            pass # Honey Cred not set, use blank.
 
         try:
-            message = f"HoneyPot Login from {src_ip} with {poos_like_honey}Credentials {alert['logdata']['USERNAME']} & {alert['logdata']['PASSWORD']} on port {alert['dst_port']}"
+            user_agent = alert['logdata']['USERAGENT']
+        except KeyError:
+            web_agent = ""
+        else:
+            web_agent = f" by {user_agent}"
+        
+        try:
+            username = alert['logdata']['USERNAME']
+        except KeyError:
+            username = ""
+        
+        try:
+            password = alert['logdata']['PASSWORD']
+        except KeyError:
+            password = ""
+
+        try:
+            message = f"HoneyPot Login from {src_ip}{web_agent} with {poos_like_honey}Credentials {username} & {password} on port {alert['dst_port']}"
         except Exception:
             logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             logger.error(traceback.format_exc())
