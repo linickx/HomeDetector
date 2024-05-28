@@ -182,8 +182,38 @@ class DataAlertsPage(Resource):
         return DataAlertsPage()
 
     def render_GET(self, request):
+        try:
+            limit = int(request.args[b'limit'][0].decode('utf-8'))
+        except Exception:
+            limit = 10
+
+        try:
+            offset = int(request.args[b'offset'][0].decode('utf-8'))
+        except Exception:
+            offset = 0
+
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS} LIMIT ? OFFSET ?", (limit, offset))
+        rows = []
+        for row in data:
+            rows.append(
+                {
+                    'id': row[0],
+                    'timestamp': row[1],
+                    'type': row[2],
+                    'src_ip': row[3],
+                    'message': row[4],
+                }
+            )
+            total = row[5]
+        response = {
+            "data":"alerts",
+            "total": total,
+            "rows": rows
+        }
         request.setHeader('Content-Type', 'application/json')
-        return (b'{"data":"alerts", "total":1, "rows":[{"timestamp":"abc", "type":"hd", "src_ip":"127.0.0.1", "message":"Hello World"}]}')
+        #response = {"data":"alerts", "total":1, "rows":[{"timestamp":"abc", "type":"hd", "src_ip":"127.0.0.1", "message":"Hello World"}]}
+        return json.dumps(response).encode('utf-8')
+        #return (b'{"data":"alerts", "total":1, "rows":[{"timestamp":"abc", "type":"hd", "src_ip":"127.0.0.1", "message":"Hello World"}]}')
 
 class DataDNSPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
@@ -204,7 +234,7 @@ class DataTuningPage(Resource):
 class DataRoot(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         path_str = path.decode('utf-8')
-        logger.info("Data Path -> %s", path_str)
+        logger.info("Data Path -> %s with => %s", path_str, request.args)
         if path_str == "alerts":
             return DataAlertsPage()
         if path_str == "dns":
@@ -250,31 +280,7 @@ class Webhook(Resource):
         """
         logger.debug(alert)
         logger.info("🔥🔥 %s 🔥🔥", alert['message'])
-        status = False
-
-        lock = threading.Lock()
-        try:
-            sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
-            sql_cursor = sql_connection.cursor()
-        except Exception:
-            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-            logger.error(traceback.format_exc())
-
-        with lock:
-            try:
-                sql_cursor.execute(
-                    f'INSERT INTO "{DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message" ) VALUES (?, ?, ?, ?, ?)', (alert['id'], alert['timestamp'], alert['type'], alert['src_ip'], alert['message'],)
-                )
-            except Exception:
-                logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                logger.error(traceback.format_exc())
-
-        with lock:
-            try:
-                sql_connection.commit()
-            except Exception:
-                logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-
+        status = sql_action(f'INSERT INTO "{DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message" ) VALUES (?, ?, ?, ?, ?)', (alert['id'], alert['timestamp'], alert['type'], alert['src_ip'], alert['message'],))
         if HA_WEBHOOK is not None:
             if not post_to_ha(alert):
                 logger.warning('Sending Alert to Webhook Failed.')
@@ -487,6 +493,37 @@ def get_host_url(request, path=None):
         return host_url + "/"
     return str(request.getHeader('X-Ingress-Path')) + "/"
 
+def sql_action(sql_str, sql_param):
+
+    lock = threading.Lock()
+    try:
+        sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
+        sql_cursor = sql_connection.cursor()
+    except Exception:
+        logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+        logger.error(traceback.format_exc())
+        return False
+
+    with lock:
+        try:
+            if re.search('SELECT', sql_str, re.IGNORECASE):
+                result = sql_cursor.execute(sql_str, sql_param).fetchall()
+            else:
+                result = sql_cursor.execute(sql_str, sql_param)
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return False
+
+    with lock:
+        try:
+            sql_connection.commit()
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            return False
+
+    sql_connection.close()
+    return result
 
 # Main!
 if __name__ == "__main__":
