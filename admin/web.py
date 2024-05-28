@@ -140,6 +140,9 @@ class AdminPage(Resource):
             )
 
 class DNSPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DNSPage()
+
     def render_GET(self, request):
         host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('dns.j2')
@@ -147,6 +150,9 @@ class DNSPage(Resource):
         return (output.encode('utf-8'))
 
 class TuningPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return TuningPage()
+
     def render_GET(self, request):
         host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('tuning.j2')
@@ -157,6 +163,8 @@ class AdminRoot(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         path_str = path.decode('utf-8')
         logger.debug("Admin Path -> %s", path_str)
+        if path_str == "data":
+            return DataRoot()
         if path_str == "dns":
             return DNSPage()
         if path_str == "tuning":
@@ -168,6 +176,50 @@ class AdminRoot(Resource):
     def render_GET(self, request):
         # no child.
         return AdminPage().render_GET(request)
+
+class DataAlertsPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataAlertsPage()
+
+    def render_GET(self, request):
+        request.setHeader('Content-Type', 'application/json')
+        return (b'{"data":"alerts"}')
+
+class DataDNSPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataDNSPage()
+
+    def render_GET(self, request):
+        request.setHeader('Content-Type', 'application/json')
+        return (b'{"data":"dns"}')
+
+class DataTuningPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataTuningPage()
+
+    def render_GET(self, request):
+        request.setHeader('Content-Type', 'application/json')
+        return (b'{"data":"tuning"}')
+
+class DataRoot(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        path_str = path.decode('utf-8')
+        logger.info("Data Path -> %s", path_str)
+        if path_str == "alerts":
+            return DataAlertsPage()
+        if path_str == "dns":
+            return DataDNSPage()
+        if path_str == "tuning":
+            return DataTuningPage()
+
+        # Default
+        return DataRoot()
+
+    def render_GET(self, request):
+        # no child.
+        request.setHeader('Content-Type', 'application/json')
+        return (b'{"data":"root"}')
+
 
 class Webhook(Resource):
     """
