@@ -182,8 +182,10 @@ class DataAlertsPage(Resource):
         return DataAlertsPage()
 
     def render_GET(self, request):
+
+        # Sanitise our Inputs...
         try:
-            limit = int(request.args[b'limit'][0].decode('utf-8'))
+            limit = int(request.args[b'limit'][0].decode('utf-8')) # <- Whatever it is submitted, is rendered an INT :)
         except Exception:
             limit = 10
 
@@ -192,7 +194,26 @@ class DataAlertsPage(Resource):
         except Exception:
             offset = 0
 
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS} LIMIT ? OFFSET ?", (limit, offset))
+        sort = "timestamp"
+        try:
+            danger_sort = request.args[b'sort'][0].decode('utf-8')  # <- Compare against expected strings below
+        except Exception:
+            pass
+        else:
+            if danger_sort in ['id', 'timestamp', 'type', 'src_ip', 'message']:
+                sort = danger_sort
+
+        order = "DESC"
+        try:
+            danger_order = request.args[b'order'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if danger_order in ['asc', 'desc']:
+                order = danger_order
+
+        # SQL Injection away!
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(

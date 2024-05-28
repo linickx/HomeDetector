@@ -6,13 +6,15 @@
   data-toggle="table"
   data-url="{{ haurl }}admin/data/alerts"
   data-side-pagination="server"
-  data-pagination="true">
+  data-pagination="true"
+  data-sort-name="timestamp"
+  data-sort-order="desc">
   <thead>
     <tr>
-      <th data-field="timestamp">Timestamp</th>
-      <th data-field="type">Type</th>
-      <th data-field="src_ip">Source IP</th>
-      <th data-field="message">Message</th>
+      <th data-field="timestamp" data-sortable="true">Timestamp</th>
+      <th data-field="type" data-sortable="true">Type</th>
+      <th data-field="src_ip" data-sortable="true">Source IP</th>
+      <th data-field="message" data-sortable="true">Message</th>
     </tr>
   </thead>
 </table>
