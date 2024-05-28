@@ -1,5 +1,56 @@
 {% extends 'base.j2' %}
 
 {% block content %}
-<h1> The DNS Page </h1>
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="domain-tab" data-bs-toggle="tab" data-bs-target="#domain-tab-pane" type="button" role="tab" aria-controls="domain-tab-pane" aria-selected="true">Domains</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="query-tab" data-bs-toggle="tab" data-bs-target="#query-tab-pane" type="button" role="tab" aria-controls="query-tab-pane" aria-selected="false">Queries</button>
+  </li>
+</ul>
+<div class="tab-content" id="myTabContent">
+  <div class="tab-pane fade show active" id="domain-tab-pane" role="tabpanel" aria-labelledby="domain-tab" tabindex="0">
+  <p>&nbsp</p>
+    <table
+        id="table-dns-domains"
+        data-toggle="table"
+        data-url="{{ haurl }}admin/data/dns/domains"
+        data-side-pagination="server"
+        data-pagination="true"
+        data-sort-name="counter"
+        data-sort-order="desc">
+        <thead>
+            <tr>
+            <th data-field="last_seen" data-sortable="true">Last Seen</th>
+            <th data-field="domain" data-sortable="true">Domain</th>
+            <th data-field="counter" data-sortable="true">Hit Count</th>
+            <th data-field="action" data-sortable="true">Action</th>
+            </tr>
+        </thead>
+    </table>
+  </div>
+  <div class="tab-pane fade" id="query-tab-pane" role="tabpanel" aria-labelledby="query-tab" tabindex="0">
+  <p>&nbsp</p>
+  <table
+        id="table-dns-queries"
+        data-toggle="table"
+        data-url="{{ haurl }}admin/data/dns/queries"
+        data-side-pagination="server"
+        data-pagination="true"
+        data-sort-name="counter"
+        data-sort-order="desc">
+        <thead>
+            <tr>
+            <th data-field="last_seen" data-sortable="true">Last Seen</th>
+            <th data-field="query" data-sortable="true">Query</th>
+            <th data-field="query_type" data-sortable="true">Query Type</th>
+            <th data-field="src" data-sortable="true">Source IP</th>
+            <th data-field="counter" data-sortable="true">Hit Count</th>
+            <th data-field="action" data-sortable="true">Action</th>
+            </tr>
+        </thead>
+    </table>
+  </div>
+</div>
 {% endblock %}

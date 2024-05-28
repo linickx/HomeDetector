@@ -1,5 +1,54 @@
 {% extends 'base.j2' %}
 
 {% block content %}
-<h1> The Tuning Page </h1>
+<ul class="nav nav-tabs" id="myTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="network-tab" data-bs-toggle="tab" data-bs-target="#network-tab-pane" type="button" role="tab" aria-controls="network-tab-pane" aria-selected="true">Netwoks/Scopes</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="host-tab" data-bs-toggle="tab" data-bs-target="#host-tab-pane" type="button" role="tab" aria-controls="host-tab-pane" aria-selected="false">Hosts</button>
+  </li>
+</ul>
+<div class="tab-content" id="myTabContent">
+  <div class="tab-pane fade show active" id="network-tab-pane" role="tabpanel" aria-labelledby="network-tab" tabindex="0">
+  <p>&nbsp</p>
+    <table
+        id="table-tuning-networks"
+        data-toggle="table"
+        data-url="{{ haurl }}admin/data/tuning/networks"
+        data-side-pagination="server"
+        data-pagination="true"
+        data-sort-name="name"
+        data-sort-order="asc">
+        <thead>
+            <tr>
+            <th data-field="name" data-sortable="true">Name</th>
+            <th data-field="ip" data-sortable="true">IP Address</th>
+            <th data-field="type" data-sortable="true">Type</th>
+            <th data-field="action" data-sortable="true">Action</th>
+            <th data-field="created" data-sortable="true">Created</th>
+            </tr>
+        </thead>
+    </table>
+  </div>
+  <div class="tab-pane fade" id="host-tab-pane" role="tabpanel" aria-labelledby="host-tab" tabindex="0">
+  <p>&nbsp</p>
+    <table
+        id="table-tuning-hosts"
+        data-toggle="table"
+        data-url="{{ haurl }}admin/data/tuning/networks"
+        data-side-pagination="server"
+        data-pagination="true"
+        data-sort-name="name"
+        data-sort-order="asc">
+        <thead>
+            <tr>
+            <th data-field="name" data-sortable="true">Name</th>
+            <th data-field="ip" data-sortable="true">IP Address</th>
+            </tr>
+        </thead>
+    </table>
+  </div>
+</div>
+
 {% endblock %}
