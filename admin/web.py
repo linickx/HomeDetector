@@ -183,7 +183,7 @@ class DataAlertsPage(Resource):
 
     def render_GET(self, request):
         request.setHeader('Content-Type', 'application/json')
-        return (b'{"data":"alerts"}')
+        return (b'{"data":"alerts", "total":1, "rows":[{"timestamp":"abc", "type":"hd", "src_ip":"127.0.0.1", "message":"Hello World"}]}')
 
 class DataDNSPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
