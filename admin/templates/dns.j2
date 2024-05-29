@@ -18,10 +18,12 @@
         data-url="{{ haurl }}admin/data/dns/domains"
         data-side-pagination="server"
         data-pagination="true"
+        data-id-field="id"
         data-sort-name="counter"
         data-sort-order="desc">
         <thead>
             <tr>
+            <th data-field="id" data-visible="false">ID</th>
             <th data-field="last_seen" data-sortable="true">Last Seen</th>
             <th data-field="domain" data-sortable="true">Domain</th>
             <th data-field="counter" data-sortable="true">Hit Count</th>
@@ -42,6 +44,7 @@
         data-sort-order="desc">
         <thead>
             <tr>
+            <th data-field="id" data-visible="false">ID</th>
             <th data-field="last_seen" data-sortable="true">Last Seen</th>
             <th data-field="query" data-sortable="true">Query</th>
             <th data-field="query_type" data-sortable="true">Query Type</th>

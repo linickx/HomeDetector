@@ -7,10 +7,12 @@
   data-url="{{ haurl }}admin/data/alerts"
   data-side-pagination="server"
   data-pagination="true"
+  data-id-field="id"
   data-sort-name="timestamp"
   data-sort-order="desc">
   <thead>
     <tr>
+      <th data-field="id" data-visible="false">ID</th>
       <th data-field="timestamp" data-sortable="true">Timestamp</th>
       <th data-field="type" data-sortable="true">Type</th>
       <th data-field="src_ip" data-sortable="true">Source IP</th>

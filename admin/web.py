@@ -221,18 +221,19 @@ class DataDNSDomainsPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_DOMAINS}) SELECT last_seen,domain,counter,action,(SELECT total FROM CTE) total FROM {DB_T_DOMAINS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_DOMAINS}) SELECT id,last_seen,domain,counter,action,(SELECT total FROM CTE) total FROM {DB_T_DOMAINS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
                 {
-                    'last_seen': row[0],
-                    'domain': row[1],
-                    'counter': row[2],
-                    'action': row[3],
+                    'id': row[0],
+                    'last_seen': row[1],
+                    'domain': row[2],
+                    'counter': row[3],
+                    'action': row[4],
                 }
             )
-            total = row[4]
+            total = row[5]
         response = {
             "data":"dns-domains",
             "total": total,
@@ -248,21 +249,22 @@ class DataDNSQueriesPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_QUERIES}) SELECT last_seen,domain_id,query,query_type,src,counter,action,(SELECT total FROM CTE) total FROM {DB_T_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_QUERIES}) SELECT id,last_seen,domain_id,query,query_type,src,counter,action,(SELECT total FROM CTE) total FROM {DB_T_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
                 {
-                    'last_seen': row[0],
-                    'domain_id': row[1],
-                    'query': row[2],
-                    'query_type': row[3],
-                    'src': row[4],
-                    'counter': row[5],
-                    'action': row[6],
+                    'id': row[0],
+                    'last_seen': row[1],
+                    'domain_id': row[2],
+                    'query': row[3],
+                    'query_type': row[4],
+                    'src': row[5],
+                    'counter': row[6],
+                    'action': row[7],
                 }
             )
-            total = row[7]
+            total = row[8]
         response = {
             "data":"dns-queries",
             "total": total,
@@ -318,18 +320,19 @@ class DataTuningNetworkPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "created", ['ip', 'type', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}) SELECT created,ip,type,action,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}) SELECT id,created,ip,type,action,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
                 {
-                    'created': row[0],
-                    'ip': row[1],
-                    'type': row[2],
-                    'action': row[3],
+                    'id': row[0],
+                    'created': row[1],
+                    'ip': row[2],
+                    'type': row[3],
+                    'action': row[4],
                 }
             )
-            total = row[4]
+            total = row[5]
         response = {
             "data":"tuning-network",
             "total": total,

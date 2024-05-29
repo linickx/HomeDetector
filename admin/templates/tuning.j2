@@ -18,10 +18,12 @@
         data-url="{{ haurl }}admin/data/tuning/networks"
         data-side-pagination="server"
         data-pagination="true"
+        data-id-field="id"
         data-sort-name="name"
         data-sort-order="asc">
         <thead>
             <tr>
+            <th data-field="id" data-visible="false">ID</th>
             <th data-field="name" data-sortable="true">Name</th>
             <th data-field="ip" data-sortable="true">IP Address</th>
             <th data-field="type" data-sortable="true">Type</th>
@@ -39,6 +41,7 @@
         data-url="{{ haurl }}admin/data/tuning/hosts"
         data-side-pagination="server"
         data-pagination="true"
+        data-id-field="id"
         data-sort-name="name"
         data-sort-order="asc">
         <thead>
