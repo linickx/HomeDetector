@@ -88,9 +88,16 @@ DB_T_HOSTS = "hosts"
 DB_T_ALERTS = "alerts"
 DB_SCHEMA_T_ALERTS = f'CREATE TABLE "{DB_T_ALERTS}" ("id" TEXT, "timestamp" TEXT, "type" TEXT, "src_ip" TEXT, "message" TEXT)'
 
+DB_V_DOMAINS = "v_domains"
+DB_SCHEMA_V_DOMAINS = f'CREATE VIEW "{DB_V_DOMAINS}" AS SELECT "{DB_T_DOMAINS}".id, "{DB_T_DOMAINS}".last_seen, "{DB_T_DOMAINS}".domain, "{DB_T_DOMAINS}".counter, "{DB_T_DOMAINS}".action, "{DB_T_NETWORKS}".ip as scope FROM "{DB_T_DOMAINS}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_DOMAINS}".scope = "{DB_T_NETWORKS}".id'
+DB_V_QUERIES = "v_queries"
+DB_SCHEMA_V_QUERIES = f'CREATE VIEW "{DB_V_QUERIES}" AS SELECT "{DB_T_QUERIES}".id, "{DB_T_QUERIES}".last_seen, "{DB_T_QUERIES}".query, "{DB_T_DOMAINS}".domain, "{DB_T_QUERIES}".query_type, "{DB_T_QUERIES}".src, "{DB_T_NETWORKS}".ip as scope, "{DB_T_QUERIES}".counter, "{DB_T_QUERIES}".action FROM "{DB_T_QUERIES}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_QUERIES}".scope_id = "{DB_T_NETWORKS}".id LEFT JOIN "{DB_T_DOMAINS}" ON "{DB_T_QUERIES}".domain_id = "{DB_T_DOMAINS}".id'
+
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 DB_SCHEMA = [
-    (DB_T_ALERTS, DB_SCHEMA_T_ALERTS)
+    (DB_T_ALERTS, DB_SCHEMA_T_ALERTS),
+    (DB_V_DOMAINS, DB_SCHEMA_V_DOMAINS),
+    (DB_V_QUERIES, DB_SCHEMA_V_QUERIES)
 ]
 
 # Stuff for the webserver.
@@ -220,8 +227,8 @@ class DataDNSDomainsPage(Resource):
 
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
-        sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_DOMAINS}) SELECT id,last_seen,domain,counter,action,(SELECT total FROM CTE) total FROM {DB_T_DOMAINS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action', 'scope'])
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DOMAINS}) SELECT id,last_seen,domain,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_DOMAINS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
@@ -231,9 +238,10 @@ class DataDNSDomainsPage(Resource):
                     'domain': row[2],
                     'counter': row[3],
                     'action': row[4],
+                    'scope': row[5]
                 }
             )
-            total = row[5]
+            total = row[6]
         response = {
             "data":"dns-domains",
             "total": total,
@@ -248,23 +256,24 @@ class DataDNSQueriesPage(Resource):
 
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
-        sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_QUERIES}) SELECT id,last_seen,domain_id,query,query_type,src,counter,action,(SELECT total FROM CTE) total FROM {DB_T_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action', 'scope', 'domain'])
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_QUERIES}) SELECT id,last_seen,domain,query,query_type,src,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
                 {
                     'id': row[0],
                     'last_seen': row[1],
-                    'domain_id': row[2],
+                    'domain': row[2],
                     'query': row[3],
                     'query_type': row[4],
                     'src': row[5],
                     'counter': row[6],
                     'action': row[7],
+                    'scope': row[8],
                 }
             )
-            total = row[8]
+            total = row[9]
         response = {
             "data":"dns-queries",
             "total": total,
@@ -567,7 +576,7 @@ def bootstrap():
         try:
             connection.execute(table[1])
         except sqlite3.OperationalError:
-            if re.search(f"table \"{table[0]}\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
+            if re.search(f"\"{table[0]}\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
                 logger.debug('DB Schema - Nothing to do')
                 status = True
             else:
