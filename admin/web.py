@@ -248,7 +248,7 @@ class DataDNSQueriesPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_DOMAINS}) SELECT last_seen,domain_id,query,query_type,src,counter,action,(SELECT total FROM CTE) total FROM {DB_T_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_QUERIES}) SELECT last_seen,domain_id,query,query_type,src,counter,action,(SELECT total FROM CTE) total FROM {DB_T_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
@@ -274,7 +274,7 @@ class DataDNSQueriesPage(Resource):
 class DataDNSRoot(Resource):
     def getChild(self, path, request):
         path_str = path.decode('utf-8')
-        logger.debug("Data Path -> %s with => %s", path_str, request.args)
+        logger.debug("Data/DNS Path -> %s with => %s", path_str, request.args)
         if path_str == "domains":
             return DataDNSDomainsPage()
         if path_str == "queries":
@@ -286,9 +286,67 @@ class DataDNSRoot(Resource):
         request.setHeader('Content-Type', 'application/json')
         return (b'{"data":"dns"}')
 
-class DataTuningPage(Resource):
+class DataTuningHostPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
-        return DataTuningPage()
+        return DataTuningHostPage()
+
+    def render_GET(self, request):
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "name", ['ip'])
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_HOSTS}) SELECT name,ip,(SELECT total FROM CTE) total FROM {DB_T_HOSTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        rows = []
+        for row in data:
+            rows.append(
+                {
+                    'name': row[0],
+                    'ip': row[1],
+                }
+            )
+            total = row[2]
+        response = {
+            "data":"tuning-host",
+            "total": total,
+            "rows": rows
+        }
+        request.setHeader('Content-Type', 'application/json')
+        return json.dumps(response).encode('utf-8')
+
+class DataTuningNetworkPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataTuningNetworkPage()
+
+    def render_GET(self, request):
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "created", ['ip', 'type', 'action'])
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}) SELECT created,ip,type,action,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        rows = []
+        for row in data:
+            rows.append(
+                {
+                    'created': row[0],
+                    'ip': row[1],
+                    'type': row[2],
+                    'action': row[3],
+                }
+            )
+            total = row[4]
+        response = {
+            "data":"tuning-network",
+            "total": total,
+            "rows": rows
+        }
+        request.setHeader('Content-Type', 'application/json')
+        return json.dumps(response).encode('utf-8')
+
+class DataTuningRoot(Resource):
+    def getChild(self, path, request):
+        path_str = path.decode('utf-8')
+        logger.debug("Data/Tuning Path -> %s with => %s", path_str, request.args)
+        if path_str == "networks":
+            return DataTuningNetworkPage()
+        if path_str == "hosts":
+            return DataTuningHostPage()
+        return DataTuningRoot()
 
     def render_GET(self, request):
         request.setHeader('Content-Type', 'application/json')
@@ -303,7 +361,7 @@ class DataRoot(Resource):
         if path_str == "dns":
             return DataDNSRoot()
         if path_str == "tuning":
-            return DataTuningPage()
+            return DataTuningRoot()
 
         # Default
         return DataRoot()
