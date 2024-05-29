@@ -78,7 +78,12 @@ if os.path.exists("/share/"):           # <- Revert addon_configs when done.
 else:
     CONFIG_DB_PATH = "./"               # Make config option
 
-CONFIG_DB_NAME = "alerts.db"        # Later, this should be user config
+CONFIG_DB_NAME = "hd.db"        # Later, this should be user config
+
+DB_T_DOMAINS = "domains"        # Tables created by DNS Listener
+DB_T_QUERIES = "queries"
+DB_T_NETWORKS = "networks"
+DB_T_HOSTS = "hosts"
 
 DB_T_ALERTS = "alerts"
 DB_SCHEMA_T_ALERTS = f'CREATE TABLE "{DB_T_ALERTS}" ("id" TEXT, "timestamp" TEXT, "type" TEXT, "src_ip" TEXT, "message" TEXT)'
@@ -182,35 +187,9 @@ class DataAlertsPage(Resource):
         return DataAlertsPage()
 
     def render_GET(self, request):
-
         # Sanitise our Inputs...
-        try:
-            limit = int(request.args[b'limit'][0].decode('utf-8')) # <- Whatever it is submitted, is rendered an INT :)
-        except Exception:
-            limit = 10
-
-        try:
-            offset = int(request.args[b'offset'][0].decode('utf-8'))
-        except Exception:
-            offset = 0
-
-        sort = "timestamp"
-        try:
-            danger_sort = request.args[b'sort'][0].decode('utf-8')  # <- Compare against expected strings below
-        except Exception:
-            pass
-        else:
-            if danger_sort in ['id', 'timestamp', 'type', 'src_ip', 'message']:
-                sort = danger_sort
-
-        order = "DESC"
-        try:
-            danger_order = request.args[b'order'][0].decode('utf-8')
-        except Exception:
-            pass
-        else:
-            if danger_order in ['asc', 'desc']:
-                order = danger_order
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "timestamp", ['id', 'timestamp', 'type', 'src_ip', 'message'])
 
         # SQL Injection away!
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
@@ -234,11 +213,74 @@ class DataAlertsPage(Resource):
         request.setHeader('Content-Type', 'application/json')
         #response = {"data":"alerts", "total":1, "rows":[{"timestamp":"abc", "type":"hd", "src_ip":"127.0.0.1", "message":"Hello World"}]}
         return json.dumps(response).encode('utf-8')
-        #return (b'{"data":"alerts", "total":1, "rows":[{"timestamp":"abc", "type":"hd", "src_ip":"127.0.0.1", "message":"Hello World"}]}')
 
-class DataDNSPage(Resource):
+class DataDNSDomainsPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
-        return DataDNSPage()
+        return DataDNSDomainsPage()
+
+    def render_GET(self, request):
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action'])
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_DOMAINS}) SELECT last_seen,domain,counter,action,(SELECT total FROM CTE) total FROM {DB_T_DOMAINS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        rows = []
+        for row in data:
+            rows.append(
+                {
+                    'last_seen': row[0],
+                    'domain': row[1],
+                    'counter': row[2],
+                    'action': row[3],
+                }
+            )
+            total = row[4]
+        response = {
+            "data":"dns-domains",
+            "total": total,
+            "rows": rows
+        }
+        request.setHeader('Content-Type', 'application/json')
+        return json.dumps(response).encode('utf-8')
+
+class DataDNSQueriesPage(Resource):
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataDNSQueriesPage()
+
+    def render_GET(self, request):
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action'])
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_DOMAINS}) SELECT last_seen,domain_id,query,query_type,src,counter,action,(SELECT total FROM CTE) total FROM {DB_T_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        rows = []
+        for row in data:
+            rows.append(
+                {
+                    'last_seen': row[0],
+                    'domain_id': row[1],
+                    'query': row[2],
+                    'query_type': row[3],
+                    'src': row[4],
+                    'counter': row[5],
+                    'action': row[6],
+                }
+            )
+            total = row[7]
+        response = {
+            "data":"dns-queries",
+            "total": total,
+            "rows": rows
+        }
+        request.setHeader('Content-Type', 'application/json')
+        return json.dumps(response).encode('utf-8')
+
+class DataDNSRoot(Resource):
+    def getChild(self, path, request):
+        path_str = path.decode('utf-8')
+        logger.debug("Data Path -> %s with => %s", path_str, request.args)
+        if path_str == "domains":
+            return DataDNSDomainsPage()
+        if path_str == "queries":
+            return DataDNSQueriesPage()
+
+        return DataDNSRoot()
 
     def render_GET(self, request):
         request.setHeader('Content-Type', 'application/json')
@@ -255,11 +297,11 @@ class DataTuningPage(Resource):
 class DataRoot(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         path_str = path.decode('utf-8')
-        logger.info("Data Path -> %s with => %s", path_str, request.args)
+        logger.debug("Data Path -> %s with => %s", path_str, request.args)
         if path_str == "alerts":
             return DataAlertsPage()
         if path_str == "dns":
-            return DataDNSPage()
+            return DataDNSRoot()
         if path_str == "tuning":
             return DataTuningPage()
 
@@ -365,12 +407,12 @@ class Webhook(Resource):
             web_agent = ""
         else:
             web_agent = f" by {user_agent}"
-        
+
         try:
             username = alert['logdata']['USERNAME']
         except KeyError:
             username = ""
-        
+
         try:
             password = alert['logdata']['PASSWORD']
         except KeyError:
@@ -532,6 +574,44 @@ def get_host_url(request, path=None):
         logger.debug("%s on %s", path, host_url)
         return host_url + "/"
     return str(request.getHeader('X-Ingress-Path')) + "/"
+
+def get_limit_offset(request):
+    """
+        Parse Args, return ints
+    """
+    try:
+        limit = int(request.args[b'limit'][0].decode('utf-8')) # <- Whatever it is submitted, is rendered an INT :)
+    except Exception:
+        limit = 10
+
+    try:
+        offset = int(request.args[b'offset'][0].decode('utf-8'))
+    except Exception:
+        offset = 0
+
+    return limit, offset
+
+def get_sort_n_order(request, default_sort, allow_list):
+    """
+    """
+    sort = default_sort
+    try:
+        danger_sort = request.args[b'sort'][0].decode('utf-8')  # <- Compare against expected strings below
+    except Exception:
+        pass
+    else:
+        if danger_sort in allow_list:
+            sort = danger_sort
+
+    order = "DESC"
+    try:
+        danger_order = request.args[b'order'][0].decode('utf-8')
+    except Exception:
+        pass
+    else:
+        if danger_order in ['asc', 'desc']:
+            order = danger_order
+    return sort, order
 
 def sql_action(sql_str, sql_param):
 
