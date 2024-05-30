@@ -16,6 +16,7 @@
         id="table-tuning-networks"
         data-toggle="table"
         data-url="{{ haurl }}admin/data/tuning/networks"
+        data-editable-url="{{ haurl }}admin/data/tuning/networks"
         data-side-pagination="server"
         data-pagination="true"
         data-id-field="id"
@@ -24,10 +25,10 @@
         <thead>
             <tr>
             <th data-field="id" data-visible="false">ID</th>
-            <th data-field="name" data-sortable="true">Name</th>
+            <th data-field="name" data-editable="true" data-sortable="true">Name</th>
             <th data-field="ip" data-sortable="true">IP Address</th>
             <th data-field="type" data-sortable="true">Type</th>
-            <th data-field="action" data-sortable="true">Action</th>
+            <th data-field="action" data-editable="true" data-sortable="true">Action</th>
             <th data-field="created" data-sortable="true">Created</th>
             </tr>
         </thead>
@@ -39,6 +40,7 @@
         id="table-tuning-hosts"
         data-toggle="table"
         data-url="{{ haurl }}admin/data/tuning/hosts"
+        data-editable-url="{{ haurl }}admin/data/tuning/hosts"
         data-side-pagination="server"
         data-pagination="true"
         data-id-field="id"
@@ -46,7 +48,8 @@
         data-sort-order="asc">
         <thead>
             <tr>
-            <th data-field="name" data-sortable="true">Name</th>
+            <th data-field="id" data-visible="false">ID</th>
+            <th data-field="name" data-editable="true" data-sortable="true">Name</th>
             <th data-field="ip" data-sortable="true">IP Address</th>
             </tr>
         </thead>

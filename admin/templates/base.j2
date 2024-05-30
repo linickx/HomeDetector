@@ -1,8 +1,11 @@
 <!DOCTYPE html><html lang='en' data-bs-theme='auto'>
 <head>
     <meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
-    <link href='{{ haurl }}static/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>
-    <link href='{{ haurl }}static/bootstrap-table.min.css' rel='stylesheet' integrity='sha384-ssKgPH7gOY4WK7o/78jNA/DvZZ8Lznb0Or+0cCmGI5jgzmdAxzP13EaHVs0QEDqz' crossorigin='anonymous'>
+    <link href='{{ haurl }}static/css/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>
+    <link href='{{ haurl }}static/css/bootstrap-table.min.css' rel='stylesheet' integrity='sha384-ssKgPH7gOY4WK7o/78jNA/DvZZ8Lznb0Or+0cCmGI5jgzmdAxzP13EaHVs0QEDqz' crossorigin='anonymous'>
+    {% if active == "tuning" %}
+    <link href='{{ haurl }}static/css/bootstrap-editable.css' rel='stylesheet'>
+    {% endif %}
     <title>Home Detector -> {{title}}</title>
 </head>
 <body>
@@ -33,9 +36,13 @@
 <span class="text-body-secondary">NB</span>
 </div>
 </footer>
-<script src="{{ haurl }}static/jquery.min.js" integrity='sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs' crossorigin='anonymous' ></script>
-<script src='{{ haurl }}static/bootstrap.bundle.min.js' integrity='sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz' crossorigin='anonymous' ></script>
-<script src='{{ haurl }}static/bootstrap-table.min.js' integrity='sha384-pmdxQX3bO3B7lHCwvVeRyhYIBGMVQt1XUJCGydHYJSFkQqU7/QxrLsC4u2a6D5PR' crossorigin='anonymous' ></script>
-<script src='{{ haurl }}static/bootstrap-auto-dark-mode.js' integrity='sha384-s+JSTy6PqcAoBx4cKTr5AdP+flis24w0tMk/+9U+99YRKwDmP7235WXT9dUupaXj' crossorigin='anonymous'></script>
+<script src="{{ haurl }}static/js/jquery.min.js" integrity='sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs' crossorigin='anonymous' ></script>
+<script src='{{ haurl }}static/js/bootstrap.bundle.min.js' integrity='sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz' crossorigin='anonymous' ></script>
+<script src='{{ haurl }}static/js/bootstrap-table.min.js' integrity='sha384-pmdxQX3bO3B7lHCwvVeRyhYIBGMVQt1XUJCGydHYJSFkQqU7/QxrLsC4u2a6D5PR' crossorigin='anonymous' ></script>
+<script src='{{ haurl }}static/js/bootstrap-auto-dark-mode.js' integrity='sha384-s+JSTy6PqcAoBx4cKTr5AdP+flis24w0tMk/+9U+99YRKwDmP7235WXT9dUupaXj' crossorigin='anonymous'></script>
+{% if active == "tuning" %}
+<script src="{{ haurl }}static/js/bootstrap-table-editable.js"></script>
+<script src="{{ haurl }}static/js/bootstrap-editable.min.js"></script>
+{% endif %}
 </body>
 </html>

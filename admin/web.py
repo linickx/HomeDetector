@@ -301,19 +301,52 @@ class DataTuningHostPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         return DataTuningHostPage()
 
+    def render_POST(self, request):
+        status = b"Update Failed"
+        logger.debug("HOSTS POST String -> %s", request.args)
+
+        try:
+            update_name = request.args[b'name'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        try:
+            update_value = request.args[b'value'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if update_name not in ['name']:
+            return (status)
+
+        try:
+            host_id = request.args[b'pk'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if not sql_action(f'UPDATE "{DB_T_HOSTS}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, host_id)):
+            return (status)
+        return b'Ok'
+
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "name", ['ip'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_HOSTS}) SELECT name,ip,(SELECT total FROM CTE) total FROM {DB_T_HOSTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_HOSTS}) SELECT id,name,ip,(SELECT total FROM CTE) total FROM {DB_T_HOSTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
                 {
-                    'name': row[0],
-                    'ip': row[1],
+                    'id': row[0],
+                    'name': row[1],
+                    'ip': row[2],
                 }
             )
-            total = row[2]
+            total = row[3]
         response = {
             "data":"tuning-host",
             "total": total,
@@ -326,10 +359,45 @@ class DataTuningNetworkPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         return DataTuningNetworkPage()
 
+    def render_POST(self, request):
+        status = b"Update Failed"
+        logger.debug("NETWORKS POST String -> %s", request.args)
+
+        try:
+            update_name = request.args[b'name'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        try:
+            update_value = request.args[b'value'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if update_name not in ['action', 'name']:
+            return (status)
+
+        if update_name == "action" and update_value not in ['learn', 'block']:
+            return (status)
+
+        try:
+            network_id = request.args[b'pk'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if not sql_action(f'UPDATE "{DB_T_NETWORKS}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, network_id)):
+            return (status)
+        return b'Ok'
+
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "created", ['ip', 'type', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}) SELECT id,created,ip,type,action,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}) SELECT id,created,ip,type,action,name,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
         rows = []
         for row in data:
             rows.append(
@@ -339,9 +407,10 @@ class DataTuningNetworkPage(Resource):
                     'ip': row[2],
                     'type': row[3],
                     'action': row[4],
+                    'name': row[5],
                 }
             )
-            total = row[5]
+            total = row[6]
         response = {
             "data":"tuning-network",
             "total": total,
@@ -752,6 +821,8 @@ def get_sort_n_order(request, default_sort, allow_list):
 
 def sql_action(sql_str, sql_param):
 
+    logger.debug('SQL STR -> %s', sql_str)
+    logger.debug('SQL PARAM -> %s', sql_param)
     lock = threading.Lock()
     try:
         sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
