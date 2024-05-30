@@ -401,7 +401,7 @@ class DNSInterceptor(BaseResolver):
             * `tuple` (id:str=None, counter:int, sql_action:str)
         """
         sql_id = None
-        sql_counter = 0
+        sql_counter = 1
         domain_id = None
 
         if learning_mode:
@@ -529,7 +529,7 @@ class DNSInterceptor(BaseResolver):
             * `tuple` (id:str=None, counter:int)
         """
         sql_id = None
-        sql_counter = 0
+        sql_counter = 1
 
         with self.lock:
             try:
