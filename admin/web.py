@@ -86,7 +86,7 @@ DB_T_NETWORKS = "networks"
 DB_T_HOSTS = "hosts"
 
 DB_T_ALERTS = "alerts"
-DB_SCHEMA_T_ALERTS = f'CREATE TABLE "{DB_T_ALERTS}" ("id" TEXT, "timestamp" TEXT, "type" TEXT, "src_ip" TEXT, "message" TEXT)'
+DB_SCHEMA_T_ALERTS = f'CREATE TABLE "{DB_T_ALERTS}" ("id" TEXT, "timestamp" TEXT, "type" TEXT, "src_ip" TEXT, "message" TEXT, "unread" INTEGER)'
 
 DB_V_DOMAINS = "v_domains"
 DB_SCHEMA_V_DOMAINS = f'CREATE VIEW "{DB_V_DOMAINS}" AS SELECT "{DB_T_DOMAINS}".id, "{DB_T_DOMAINS}".last_seen, "{DB_T_DOMAINS}".domain, "{DB_T_DOMAINS}".counter, "{DB_T_DOMAINS}".action, "{DB_T_NETWORKS}".ip as scope FROM "{DB_T_DOMAINS}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_DOMAINS}".scope = "{DB_T_NETWORKS}".id'
@@ -413,7 +413,7 @@ class Webhook(Resource):
         """
         logger.debug(alert)
         logger.info("🔥🔥 %s 🔥🔥", alert['message'])
-        status = sql_action(f'INSERT INTO "{DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message" ) VALUES (?, ?, ?, ?, ?)', (alert['id'], alert['timestamp'], alert['type'], alert['src_ip'], alert['message'],))
+        status = sql_action(f'INSERT INTO "{DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message", "unread" ) VALUES (?, ?, ?, ?, ?, ?)', (alert['id'], alert['timestamp'], alert['type'], alert['src_ip'], alert['message'],alert['unread']))
         if HA_WEBHOOK is not None:
             if not post_to_ha(alert):
                 logger.warning('Sending Alert to Webhook Failed.')
@@ -481,6 +481,7 @@ class Webhook(Resource):
             'type': alert_type,
             'src_ip': src_ip,
             'message': message,
+            'unread': 1
         }
 
         if self.__sqlSave(sql_data):
@@ -566,6 +567,7 @@ class Webhook(Resource):
             'type': alert_type,
             'src_ip': src_ip,
             'message': message,
+            'unread': 1
         }
 
         if self.__sqlSave(sql_data):
