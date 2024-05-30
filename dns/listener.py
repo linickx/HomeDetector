@@ -12,6 +12,7 @@ import datetime
 import hashlib
 import traceback
 import threading
+from multiprocessing import Process
 
 logger = logging.getLogger("HomeAssistant")
 log_handler = logging.StreamHandler()
@@ -32,6 +33,14 @@ try:
 except ModuleNotFoundError:
     logger.error('netaddr not Installed - try pip install netaddr')
     sys.exit(1)
+
+try:
+    import requests
+except ModuleNotFoundError:
+    logger.error('requests not Installed - try pip install requests')
+    WEBHOOKER = False
+else:
+    WEBHOOKER = True
 
 # Some Configurable Options
 try:
@@ -138,7 +147,7 @@ DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT,
 DB_T_QUERIES = "queries"
 DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"scope_id" TEXT, "query" TEXT, "query_type", "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)'
 DB_T_NETWORKS = "networks"
-DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT)'
+DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT, "name" TEXT)'
 DB_T_HOSTS = "hosts"
 DB_SCHEMA_T_HOSTS = f'CREATE TABLE "{DB_T_HOSTS}" ("id" TEXT, "ip" TEXT, "scope_id" TEXT, "name" TEXT)'
 
@@ -156,7 +165,7 @@ if os.path.exists("/share/"):           # <- Should be addon_configs .
 else:
     CONFIG_DB_PATH = "./"               # Make config option
 
-CONFIG_DB_NAME = "dns.db"        # Later, this should be user config
+CONFIG_DB_NAME = "hd.db"        # Later, this should be user config
 
 # CLasses & Functions...
 class DNSInterceptor(BaseResolver):
@@ -752,7 +761,20 @@ class DNSInterceptor(BaseResolver):
             if not self.passThePacket(the_domain_action):
                 self.log.warning("🔥 New Authority DOMAIN %s Detected for Request %s 🔥", the_domain, qname)
                 if the_domain_id is None:
-                    self.sqlDomains(the_domain,scope_id,'block')
+                    the_domain_action, the_domain_id = self.sqlDomains(the_domain,scope_id,'block')
+                if WEBHOOKER:
+                    data = {
+                        'type':'dns',
+                        'alert_type': 'dns-domain',
+                        'timestamp': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds'),
+                        'src_ip': src_ip,
+                        'scope_id': scope_id,
+                        'domain_id': the_domain_id,
+                        'domain': str(the_domain),
+                        'query': str(qname)
+                    }
+                    post_process_domain = Process(target=postwebhook, args=(data, self.log)) # Start a new process to avoid DNS latency
+                    post_process_domain.start()
                 if DNS_FIREWALL_ON:
                     self.log.info("🔥🔥 DOMAIN BLOCKED %s 🔥🔥", the_domain)
                     reply.header.rcode = getattr(RCODE,'NXDOMAIN')
@@ -760,6 +782,19 @@ class DNSInterceptor(BaseResolver):
 
             if DNS_DETECT_ON_HOST and not self.passThePacket(the_query_action):
                 self.log.warning("🔥 New QUERY %s Detected for %s (%s) 🔥", qname, src_ip, scope_id)
+                if WEBHOOKER:
+                    data = {
+                        'type':'dns',
+                        'alert_type': 'dns-query',
+                        'timestamp': datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds'),
+                        'src_ip': src_ip,
+                        'scope_id': scope_id,
+                        'domain_id': the_domain_id,
+                        'domain': str(the_domain),
+                        'query': str(qname)
+                    }
+                    post_process_query = Process(target=postwebhook, args=(data, self.log))
+                    post_process_query.start()
                 if DNS_FIREWALL_ON:
                     self.log.info("🔥🔥 QUERY BLOCKED %s 🔥🔥", the_domain)
                     reply.header.rcode = getattr(RCODE,'NXDOMAIN')
@@ -787,6 +822,25 @@ class DNSInterceptor(BaseResolver):
             resolver_counter+=1
 
         return reply
+
+def postwebhook(data=None, log:logging=logging, url='http://localhost:8099/notify'):
+    """
+        Post to our webhook
+    """
+    status = True
+    try:
+        r = requests.post(url=url, json=data, timeout=10)
+    except Exception:
+        log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
+        status = False
+    else:
+        if r.status_code != 200:
+            status = False
+            log.error("Status: %s -> %s", r.status_code, r.content)
+        elif DEBUG_MODE:
+            log.info("Post Hook Status: %s -> %s", r.status_code, r.content)
+
+    return status
 
 def bootstrap(log:logging=logging):
     """
@@ -915,6 +969,12 @@ def main(dnsi_logger):
                         logger=dns_logger,
                         tcp=True)
     tcp_server.start_thread()
+
+    if udp_server.isAlive():
+        postwebhook({'type':'dns', 'logdata':{'msg':'UDP DNS Server Started'}})
+
+    if tcp_server.isAlive():
+        postwebhook({'type':'dns', 'logdata':{'msg':'TCP DNS Server Started'}})
 
     while udp_server.isAlive():
         time.sleep(1)

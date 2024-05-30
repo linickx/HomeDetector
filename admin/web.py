@@ -421,13 +421,78 @@ class Webhook(Resource):
 
     def __process_dns(self, alert:dict=None):
         logger.debug(alert)
-        return b"ok \n"
+        status = b"Failed \n"
+
+        try:
+            logdata_msg = alert['logdata']['msg']
+        except Exception:
+            pass
+        else:
+            logger.info("🎧 -> %s", str(logdata_msg))
+            return b"ok \n"
+
+        try:
+            alert_type = alert['alert_type']
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return status
+
+        try:
+            timestamp = alert['timestamp']
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return status
+
+        try:
+            src_ip = alert['src_ip']
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return status
+
+        try:
+            domain = alert['domain']
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return status
+
+        try:
+            query = alert['query']
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return status
+
+        if alert_type == "dns-domain":
+            message = f"Domain anomaly {domain} from {src_ip} for lookup {query}"
+        elif alert_type == "dns-query":
+            message = f"Query anomaly {query} from {src_ip}"
+        else:
+            logger.error('Unhandled Alert Type %s', alert_type)
+            return status
+
+        record_id = self.createID([timestamp, alert_type, src_ip])
+        sql_data = {
+            'id':record_id,
+            'timestamp':timestamp,
+            'type': alert_type,
+            'src_ip': src_ip,
+            'message': message,
+        }
+
+        if self.__sqlSave(sql_data):
+            status = b"ok \n"
+
+        return status
 
     def __process_canary(self, alert:dict=None):
         """
             Convert what we got into standard format..
         """
-        logger.info(alert)
+        logger.debug(alert)
         status = b"Failed \n"
 
         try:
