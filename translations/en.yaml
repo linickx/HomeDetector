@@ -8,7 +8,7 @@ configuration:
     description: If left blank, will use default.
   learning_duration:
     name: Learning Mode Duration
-    description: How long should a network range learn/pass domains before alerting on anomalies.
+    description: How long should a network range learn/pass domains before alerting on anomalies. Default is 30 days.
   ha_webhook_id:
     name: Webhook ID
     description: Home Assistant Web Hook ID for upstream automations/alerts/notifications
@@ -17,7 +17,7 @@ configuration:
     description: Action for unlisted networks/ips. Default is ignore. Valid Options => ignore or block.
   detect_on_host_query:
     name: Detect on Host Query
-    description: Anomonly detection is by Domain (SOA), this will detect on A/CNAME changes.
+    description: Anomonly detection is by Domain (SOA), this will detect on A/CNAME changes. Default is False
   soa_failure_action:
     name: SOA Failure Action
     description: What to do when SOA lookups fail. Default is ignore. Valid Options => ignore or block.

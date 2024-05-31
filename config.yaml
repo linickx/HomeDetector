@@ -21,7 +21,7 @@ ports:
   80/tcp:
 ingress: true
 ingress_entry: admin
-panel_icon: mdi:incognito
+panel_icon: mdi:home-search-outline
 panel_admin: true
 homeassistant_api: true
 options:
@@ -42,11 +42,11 @@ schema:
   resolvers:
     - server: str
       port: int
-  learning_duration: int
-  ha_webhook_id: str
-  unknown_ip_action: str
+  learning_duration: int?
+  ha_webhook_id: str?
+  unknown_ip_action: str?
   detect_on_host_query: bool
-  soa_failure_action: str
+  soa_failure_action: str?
   dns_blocking_mode: bool
   custom_host_records:
     - name: str

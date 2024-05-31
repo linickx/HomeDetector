@@ -131,8 +131,8 @@ class WebRootPage(Resource):
         return (
             b"<!DOCTYPE html><html lang='en' data-bs-theme='auto'><head>"
             b"<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
-            b"<link href='static/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>"
-            b"<script src='static/bootstrap-auto-dark-mode.js'></script>"
+            b"<link href='static/css/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>"
+            b"<script src='static/js/bootstrap-auto-dark-mode.js'></script>"
             b"<title>Home Detector</title>"
             b"</head><body>There is no spoon</body></html>"
             )
@@ -684,8 +684,8 @@ class Webhook(Resource):
         return (
             b"<!DOCTYPE html><html lang='en' data-bs-theme='auto'><head>"
             b"<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
-            b"<link href='static/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>"
-            b"<script src='static/bootstrap-auto-dark-mode.js'></script>"
+            b"<link href='static/css/bootstrap.min.css' rel='stylesheet' integrity='sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH' crossorigin='anonymous'>"
+            b"<script src='static/js/bootstrap-auto-dark-mode.js'></script>"
             b"<title>Home Detector</title>"
             b"</head><body>Kill All Humans!</body></html>"
             )
