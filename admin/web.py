@@ -125,6 +125,17 @@ else:
     logger.debug('Reading Templates from %s', TEMPLATE_FILES)
     logger.debug(os.listdir(TEMPLATE_FILES))
 
+HA_ADDON_NAME = ""
+try:
+    addon_hostname = os.environ['HOSTNAME']
+except KeyError:
+    pass
+else:
+    addon_re = re.search(r'([a-z0-9]*)-([a-z0-9-]*)', addon_hostname)
+    if addon_re:
+        HA_ADDON_NAME = f"{addon_re[1]}_{addon_re[2]}" # Convert from xxx-aaa -> xxx_aaa
+logger.info('HOSTANME -> %s', HA_ADDON_NAME)
+
 # To class children!
 class WebRootPage(Resource):
     def render_GET(self, request): # pylint: disable=W0613
@@ -145,7 +156,7 @@ class AdminPage(Resource):
     def render_GET(self, request):
         host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('admin.j2')
-        output = admin_template.render(title="Alerts", active="alerts", haurl=host_url)
+        output = admin_template.render(title="Alerts", active="alerts", haurl=host_url, haaddon=HA_ADDON_NAME)
         return (
             #b"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Home Detector Administration</title></head><body>Admin</body></html>"
             output.encode('utf-8')
@@ -158,7 +169,7 @@ class DNSPage(Resource):
     def render_GET(self, request):
         host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('dns.j2')
-        output = admin_template.render(title="DNS", active="dns", haurl=host_url)
+        output = admin_template.render(title="DNS", active="dns", haurl=host_url, haaddon=HA_ADDON_NAME)
         return (output.encode('utf-8'))
 
 class TuningPage(Resource):
@@ -168,7 +179,7 @@ class TuningPage(Resource):
     def render_GET(self, request):
         host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('tuning.j2')
-        output = admin_template.render(title="Tuning", active="tuning", haurl=host_url)
+        output = admin_template.render(title="Tuning", active="tuning", haurl=host_url, haaddon=HA_ADDON_NAME)
         return (output.encode('utf-8'))
 
 class AdminRoot(Resource):
