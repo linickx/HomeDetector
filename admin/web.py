@@ -213,6 +213,7 @@ class DataAlertsPage(Resource):
         # SQL Injection away!
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}{sql_where}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
+        total = 0
         for row in data:
             rows.append(
                 {
@@ -255,6 +256,7 @@ class DataDNSDomainsPage(Resource):
 
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DOMAINS}{sql_where}) SELECT id,last_seen,domain,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_DOMAINS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
+        total = 0
         for row in data:
             rows.append(
                 {
@@ -297,6 +299,7 @@ class DataDNSQueriesPage(Resource):
 
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_QUERIES}{sql_where}) SELECT id,last_seen,domain,query,query_type,src,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_QUERIES}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
+        total = 0
         for row in data:
             rows.append(
                 {
@@ -387,6 +390,7 @@ class DataTuningHostPage(Resource):
                 sql_params = (search_string, search_string, limit, offset)
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_HOSTS}{sql_where}) SELECT id,name,ip,(SELECT total FROM CTE) total FROM {DB_T_HOSTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
+        total = 0
         for row in data:
             rows.append(
                 {
@@ -459,6 +463,7 @@ class DataTuningNetworkPage(Resource):
                 sql_params = (search_string, search_string, limit, offset)
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}{sql_where}) SELECT id,created,ip,type,action,name,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
+        total = 0
         for row in data:
             rows.append(
                 {
