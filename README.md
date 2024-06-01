@@ -18,9 +18,23 @@ Additional log-in detections for your home network!
 * _Optional_ HTTP (NAS Web Page) HoneyPot
 * _Optional_ FTP HoneyPot
 
-## Admin Stuff...
+## 📝 Admin Stuff 📝
+
+Here are some of the things you can do in the config, an admin web page is provided for monitoring.
 
 * Integrate with Home Assistant Webhooks to send external notifications
-* Tune learning to suit your needs, default 30days DNS observation
+* Tune learning to suit your needs, default 30 days DNS observation
 * Inject Custom DNS A responses
 * Custom upstream DNS resolvers
+
+## 🙏🏻 Thank you 🙏🏻
+
+Thank you world of Open-Source, this project would be nowhere without you. Notable mentions...
+
+* [Michael Irigoyen](https://pictogrammers.com/contributor/mririgoyen/) for the Logo (_Material Design Icon_)
+* Paul for publishing [dnslib](https://github.com/paulc/dnslib)
+* [Thinkst](https://canary.tools/) for publishing [OpenCanary](https://opencanary.readthedocs.io/)
+* [Mark Otto and team](https://getbootstrap.com/docs/5.3/about/team/) for [Bootstrap](https://getbootstrap.com)
+* [文翼 (wenzhixin)](https://github.com/wenzhixin) for [bootstrap-table](https://bootstrap-table.com)
+* [Stefan Haack](https://shaack.com) for [bootstrap-auto-darkmode](https://github.com/shaack/bootstrap-auto-dark-mode)
+* ..._and anyone else who contributed to the python libraries installed from_ `requirements.txt` 😉
