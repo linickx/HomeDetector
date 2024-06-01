@@ -1,5 +1,6 @@
 name: Home Detector
 description: A lightweight intrusion detector.
+url: https://github.com/linickx/HomeDetector
 version: "0.0.1"
 slug: homedetector
 init: false
@@ -9,7 +10,7 @@ arch:
   - armhf
   - armv7
   - i386
-startup: services
+startup: application
 map:
   - addon_config:rw
   - share:rw
