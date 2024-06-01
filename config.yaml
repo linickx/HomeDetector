@@ -27,12 +27,7 @@ homeassistant_api: true
 options:
   networks: []
   resolvers: []
-  networks_ttl: 3600
-  learning_duration: 30
-  ha_webhook_id:
-  unknown_ip_action: ignore
   detect_on_host_query: false
-  soa_failure_action: ignore
   dns_blocking_mode: false
   custom_host_records: []
   debug: false
@@ -43,12 +38,12 @@ schema:
   resolvers:
     - server: str
       port: int
-  networks_ttl: int?
-  learning_duration: int?
-  ha_webhook_id: str?
-  unknown_ip_action: str?
+  networks_ttl: "int?"
+  learning_duration: "int?"
+  ha_webhook_id: "str?"
+  unknown_ip_action: "str?"
   detect_on_host_query: bool
-  soa_failure_action: str?
+  soa_failure_action: "str?"
   dns_blocking_mode: bool
   custom_host_records:
     - name: str
