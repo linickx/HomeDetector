@@ -110,6 +110,14 @@ except Exception:
 finally:
     logger.debug('🫥  Loading Networks => %s', str(LOCAL_NETWORKS))
 
+LOCAL_NETWORKS_TTL = 3600
+try:
+    LOCAL_NETWORKS_TTL = int(OPTIONS_DATA['networks_ttl'])
+except Exception:
+    pass
+finally:
+    logger.debug('🫥  networks_ttl => %s seconds', str(LOCAL_NETWORKS_TTL))
+
 LEARNING_DURATION = 30
 try:
     LEARNING_DURATION = int(OPTIONS_DATA['learning_duration'])
@@ -264,9 +272,11 @@ class DNSInterceptor(BaseResolver):
                 except Exception:
                     self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                     self.log.error(traceback.format_exc())
+                sql_cursor.close()
 
             if len(sql_rows) == 0:
                 created = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
+                ttl = datetime.datetime.now(datetime.UTC)
                 action = "learn"
                 params = (
                     scope_id,
@@ -277,6 +287,7 @@ class DNSInterceptor(BaseResolver):
                 )
                 self.log.debug(str(params))
                 with self.lock:
+                    sql_cursor = self.sql_connection.cursor()
                     try:
                         sql_cursor.execute(                       # Create a new Row
                             f'INSERT INTO "{DB_T_NETWORKS}" ("id", "ip", "type", "action", "created") VALUES (?, ?, ?, ?, ?)',
@@ -285,27 +296,68 @@ class DNSInterceptor(BaseResolver):
                     except Exception:
                         self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                         self.log.error(traceback.format_exc())
+                    sql_cursor.close()
             else:
                 action = sql_rows[0][1]
                 created = datetime.datetime.fromisoformat(sql_rows[0][2])
-                now = datetime.datetime.now(datetime.UTC)
-                delta = now - created
-                self.log.debug('ID: %s | Action: %s | Created: %s | %s days old', sql_rows[0], action, created, delta.days)
+                action, ttl = self.learningModeReValidation(scope_id,action, created)
 
-                if delta.days >= LEARNING_DURATION and (action != "block"):
-                    action = "block"
-                    self.log.warning('🔥🔥 Learning Mode over for Scope %s Setting to detect new domains 🔥🔥', scope_id)
-                    with self.lock:
-                        try:
-                            sql_cursor.execute(   # Update the existing Row
-                                f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
-                            )
-                        except Exception:
-                            self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
-                            self.log.error(traceback.format_exc())
+            self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action, 'created':created, 'ttl':ttl})
 
-            sql_cursor.close()
-            self.local_networks.append({'id': scope_id, 'scope':scope, 'action': action})
+    def learningModeReValidation(self, scope_id, current_action, created, ttl=None):
+        """
+            Periodically ReValidate the status of a Network Against the DB/
+        """
+        action = current_action
+        now = datetime.datetime.now(datetime.UTC)
+
+        if isinstance(created, str): # Did this come from the DB or Python 🤷🏻‍♂️
+            created = datetime.datetime.fromisoformat(created)
+
+        delta = now - created
+        self.log.debug('ID: %s | Action: %s | Created: %s | %s days old | TTL: %s', scope_id, current_action, created, delta.days, str(ttl))
+
+        # See if the Learning Duration has expired
+        if delta.days >= LEARNING_DURATION and (current_action != "block"):
+            action = "block"
+            self.log.warning('🔥🔥 Learning Mode over for Scope %s Setting to detect new domains 🔥🔥', scope_id)
+            with self.lock:
+                sql_cursor = self.sql_connection.cursor()
+                try:
+                    sql_cursor.execute(   # Update the existing Row
+                        f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
+                    )
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
+                sql_cursor.close()
+
+        if ttl is None:
+            ttl = now
+            return action, ttl  # Exit early as this is a load.
+
+        # See if the perodic refresh has kicked in?
+        delta_force = now - ttl
+        if delta_force.seconds >= LOCAL_NETWORKS_TTL:
+            self.log.debug('ID %s | TTL Expired -> %s', scope_id, delta_force.seconds)
+            with self.lock:
+                sql_cursor = self.sql_connection.cursor()
+                try:
+                    sql_rows = sql_cursor.execute(f'SELECT "action" FROM "{DB_T_NETWORKS}" WHERE id = ?', (scope_id,)).fetchall()
+                except Exception:
+                    self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+                    self.log.error(traceback.format_exc())
+                sql_cursor.close()
+
+            if len(sql_rows) > 0:
+                action = sql_rows[0][0]
+            ttl = now
+        else:
+            ttl = None # Returning no TTL as it doesn't need to change
+
+        if action != current_action:
+            self.log.warning('SCOPE ID %s has been updated from %s to %s', scope_id, current_action, action)
+        return action, ttl
 
     def sqlKnownHosts(self, source_ip:str=None, scope_id:str=None):
         """
@@ -347,16 +399,23 @@ class DNSInterceptor(BaseResolver):
 
         """
         self.log.debug("Source IP -> %s", source_ip)
+        counter = 0
 
         if len(self.local_networks) > 0:
             for scope in self.local_networks:
                 if source_ip in scope['scope']:
-                    learning_mode = bool(scope['action'] == 'learn')
-                    self.log.debug("Source IP -> %s (%s) -> %s (%s)", source_ip, scope['id'], scope['action'], str(learning_mode))
+                    action,ttl = self.learningModeReValidation(scope['id'], scope['action'], scope['created'], scope['ttl'])
+                    learning_mode = bool(action == 'learn')
+                    self.log.debug("Source IP -> %s (%s) -> %s (%s) [TTL: %s]", source_ip, scope['id'], scope['action'], str(learning_mode), ttl)
+                    if ttl is not None:
+                        self.log.debug('Scope %s replacing TTL %s -> %s', scope['id'], str(scope['ttl']), str(ttl))
+                        del self.local_networks[counter]    # Delete & replace list entry... to update TTL
+                        self.local_networks.append({'id': scope['id'], 'scope':scope['scope'], 'action': scope['action'], 'created':scope['created'], 'ttl':ttl})
 
                     if source_ip not in self.known_hosts:
                         self.sqlKnownHosts(source_ip, scope['id'])
                     return learning_mode, scope['id']
+                counter+=1
 
         self.log.debug("Source IP -> %s -> Uknown IP Action: %s", source_ip, UKNOWN_IP_PASS)
         return UKNOWN_IP_PASS, None

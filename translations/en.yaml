@@ -6,6 +6,9 @@ configuration:
   resolvers:
     name: Upstream DNS Servers
     description: If left blank, will use default.
+  networks_ttl:
+    name: Network Scope TTL (Time To Live)
+    description: How often should the mode of a network be re-validated for blocking or learning. Default is 3600 seconds (1hr)
   learning_duration:
     name: Learning Mode Duration
     description: How long should a network range learn/pass domains before alerting on anomalies. Default is 30 days.

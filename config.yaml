@@ -27,6 +27,7 @@ homeassistant_api: true
 options:
   networks: []
   resolvers: []
+  networks_ttl: 3600
   learning_duration: 30
   ha_webhook_id:
   unknown_ip_action: ignore
@@ -42,6 +43,7 @@ schema:
   resolvers:
     - server: str
       port: int
+  networks_ttl: int?
   learning_duration: int?
   ha_webhook_id: str?
   unknown_ip_action: str?
