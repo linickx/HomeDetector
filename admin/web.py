@@ -198,8 +198,20 @@ class DataAlertsPage(Resource):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "timestamp", ['id', 'timestamp', 'type', 'src_ip', 'message'])
 
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE ((timestamp||type||src_ip||message) LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+
         # SQL Injection away!
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}{sql_where}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         for row in data:
             rows.append(
@@ -228,7 +240,20 @@ class DataDNSDomainsPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action', 'scope'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DOMAINS}) SELECT id,last_seen,domain,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_DOMAINS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE ((last_seen||domain||scope) LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DOMAINS}{sql_where}) SELECT id,last_seen,domain,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_DOMAINS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         for row in data:
             rows.append(
@@ -257,7 +282,20 @@ class DataDNSQueriesPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action', 'scope', 'domain'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_QUERIES}) SELECT id,last_seen,domain,query,query_type,src,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_QUERIES} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE ((last_seen||domain||query||src||scope) LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_QUERIES}{sql_where}) SELECT id,last_seen,domain,query,query_type,src,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_QUERIES}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         for row in data:
             rows.append(
@@ -336,7 +374,18 @@ class DataTuningHostPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "name", ['ip'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_HOSTS}) SELECT id,name,ip,(SELECT total FROM CTE) total FROM {DB_T_HOSTS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE (ip LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_HOSTS}{sql_where}) SELECT id,name,ip,(SELECT total FROM CTE) total FROM {DB_T_HOSTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         for row in data:
             rows.append(
@@ -397,7 +446,18 @@ class DataTuningNetworkPage(Resource):
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "created", ['ip', 'type', 'action'])
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}) SELECT id,created,ip,type,action,name,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS} ORDER BY {sort} {order} LIMIT ? OFFSET ?", (limit, offset))
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE (ip LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_NETWORKS}{sql_where}) SELECT id,created,ip,type,action,name,(SELECT total FROM CTE) total FROM {DB_T_NETWORKS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         for row in data:
             rows.append(
@@ -842,6 +902,8 @@ def sql_action(sql_str, sql_param):
             logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             logger.error(traceback.format_exc())
             return False
+
+        sql_cursor.close()
 
     with lock:
         try:

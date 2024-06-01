@@ -15,9 +15,11 @@
     <table
         id="table-dns-domains"
         data-toggle="table"
-        data-url="{{ haurl }}admin/data/dns/domains"
-        data-side-pagination="server"
         data-pagination="true"
+        data-side-pagination="server"
+        data-search="true"
+        data-searchable="true"
+        data-url="{{ haurl }}admin/data/dns/domains"
         data-id-field="id"
         data-sort-name="counter"
         data-sort-order="desc">
@@ -38,9 +40,11 @@
   <table
         id="table-dns-queries"
         data-toggle="table"
-        data-url="{{ haurl }}admin/data/dns/queries"
-        data-side-pagination="server"
         data-pagination="true"
+        data-side-pagination="server"
+        data-search="true"
+        data-searchable="true"
+        data-url="{{ haurl }}admin/data/dns/queries"
         data-sort-name="counter"
         data-sort-order="desc">
         <thead>
