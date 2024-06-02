@@ -28,6 +28,7 @@ homeassistant_api: true
 options:
   networks: []
   resolvers: []
+  ha_notify: true
   detect_on_host_query: false
   dns_blocking_mode: false
   custom_host_records: []
@@ -41,6 +42,7 @@ schema:
       port: int
   networks_ttl: "int?"
   learning_duration: "int?"
+  ha_notify: bool
   ha_webhook_id: "str?"
   unknown_ip_action: "str?"
   detect_on_host_query: bool

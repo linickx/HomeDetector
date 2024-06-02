@@ -6,6 +6,9 @@ configuration:
   resolvers:
     name: Upstream DNS Servers
     description: If left blank, will use default.
+  ha_notify:
+    name: Home Assistant Persistent Notifications
+    description: Send all alerts to the admin notification panel. Default is True.
   networks_ttl:
     name: Network Scope TTL (Time To Live)
     description: How often should the mode of a network be re-validated for blocking or learning. Default is 3600 seconds (1hr)

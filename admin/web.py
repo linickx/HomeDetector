@@ -39,6 +39,7 @@ try:
         options_f = file.read()
 except Exception:
     logger.info('🚨🚨 Unable to -> FIND <- Home Assistant Options, will use DEFAULTS 🚨🚨')
+    OPTIONS_DATA = {}
 else:
     try:
         OPTIONS_DATA = json.loads(options_f)
@@ -65,12 +66,23 @@ except Exception:
 else:
     logger.info('💌  Home Assistant WebHook ID => %s', HA_WEBHOOK)
 
-if HA_WEBHOOK is not None:
+if not bool(OPTIONS_DATA): # Empty Dict, not running in HAOS
+    HA_NOTIFY = False
+else:                       # Not empty
+    try:
+        HA_NOTIFY = bool(OPTIONS_DATA['ha_notify'])
+    except Exception:       # Default => True
+        HA_NOTIFY = True
+
+if HA_NOTIFY or HA_WEBHOOK is not None:
     try:
         import requests
     except ModuleNotFoundError:
         logger.critical('Disabling Webhook, requests is missing')
         HA_WEBHOOK = None
+        HA_NOTIFY = False
+
+logger.info('📨 Home Assistant Notifications => %s', str(HA_NOTIFY))
 
 # Initial Config vars.
 if os.path.exists("/share/"):           # <- Revert addon_configs when done.
@@ -559,9 +571,12 @@ class Webhook(Resource):
         logger.debug(alert)
         logger.info("🔥🔥 %s 🔥🔥", alert['message'])
         status = sql_action(f'INSERT INTO "{DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message", "unread" ) VALUES (?, ?, ?, ?, ?, ?)', (alert['id'], alert['timestamp'], alert['type'], alert['src_ip'], alert['message'],alert['unread']))
-        if HA_WEBHOOK is not None:
-            if not post_to_ha(alert):
+        if HA_WEBHOOK is not None:          # Webhook integration
+            if not post_to_ha_hook(alert):
                 logger.warning('Sending Alert to Webhook Failed.')
+        if HA_NOTIFY:                       # Default Notifications
+            if not post_to_ha_notify(alert):
+                logger.warning('Sending Home Assistant Notification Failed.')
         return status
 
     def __process_dns(self, alert:dict=None):
@@ -805,7 +820,7 @@ def bootstrap():
     connection.close() # Ok, all good, it's close.
     return status
 
-def post_to_ha(data:dict=None, webhook_id:str=HA_WEBHOOK):
+def post_to_ha_hook(data:dict=None, webhook_id:str=HA_WEBHOOK):
     """
         Post data to Home Assistant WebHook
     """
@@ -837,6 +852,48 @@ def post_to_ha(data:dict=None, webhook_id:str=HA_WEBHOOK):
     if DEBUG_MODE:
         try:
             logger.info("Hook Content -> %s", str(r.content))
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+
+    return status
+
+def post_to_ha_notify(data:dict=None):
+    """
+        Post data to Home Assistant Notification Panel
+    """
+    url = 'http://supervisor/core/api/services/notify/persistent_notification'
+    logger.debug('Sending HA Notification %s to %s', str(data), url)
+    status = False
+    headers = {}
+
+    try:
+        token = os.environ['SUPERVISOR_TOKEN']
+    except Exception:
+        logger.error('Failed to Read Home Assistant Auth Token')
+    else:
+        headers['Authorization'] = f"Bearer {token}"
+
+    notify_data = {
+        'title': f"Home Detector Alert | {data['type']} | {data['timestamp']}",
+        'message': data['message']
+    }
+
+    try:
+        r = requests.post(json=notify_data, url=url, headers=headers, timeout=30)
+    except Exception:
+        logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+        logger.error(traceback.format_exc())
+        status_code = 1000
+    else:
+        status_code = r.status_code
+
+    logger.debug('Notify Status Code: %s', status_code)
+    if status_code == 200:
+        status = True
+
+    if DEBUG_MODE:
+        try:
+            logger.info("Notify Content -> %s", str(r.content))
         except Exception:
             logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
 
