@@ -1,0 +1,19 @@
+alias: Home Detector Notify only HoneyPot
+description: "A Webhook that only responds to HoneyPot Alerts"
+trigger:
+  - platform: webhook
+    allowed_methods:
+      - POST
+      - PUT
+    local_only: true
+    webhook_id: secret_home_detector_webhook_id
+condition:
+  - condition: template
+    value_template: "{{trigger.json.type is search(\"canary\", ignorecase=False)}}"
+action:
+  - service: notify.persistent_notification
+    metadata: {}
+    data:
+      title: 🍯 {{trigger.json.type}} | {{trigger.json.timestamp}}
+      message: "{{trigger.json.message}}"
+mode: single

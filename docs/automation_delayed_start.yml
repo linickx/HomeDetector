@@ -1,0 +1,16 @@
+alias: Home Detector Delayed Start
+description: "Delay the start of home detector by 30s"
+trigger:
+  - platform: homeassistant
+    event: start
+condition: []
+action:
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 30
+      milliseconds: 0
+  - service: hassio.addon_start
+    data:
+      addon: local_homedetector
+mode: single
