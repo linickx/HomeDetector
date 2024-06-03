@@ -873,8 +873,13 @@ def post_to_ha_notify(data:dict=None):
     else:
         headers['Authorization'] = f"Bearer {token}"
 
+    if re.search('canary', data['type'], re.IGNORECASE):
+        title_icon = "🍯"
+    else:
+        title_icon = "🔥"
+
     notify_data = {
-        'title': f"Home Detector Alert | {data['type']} | {data['timestamp']}",
+        'title': f"{title_icon} Home Detector Alert | {data['type']}",
         'message': data['message']
     }
 
