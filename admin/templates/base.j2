@@ -35,7 +35,7 @@
                 <a href="{{ haurl}}admin" type="button" class="btn btn-outline-primary {% if active == "alerts" %}active{% endif %}">Alerts</a>
                 <a href="{{ haurl}}admin/dns" type="button" class="btn btn-outline-primary {% if active == "dns" %}active{% endif %}">DNS</a>
                 <a href="{{ haurl}}admin/tuning" type="button" class="btn btn-outline-primary {% if active == "tuning" %}active{% endif %}">Tuning</a>
-                {% if haaddon != "" %}<a href="/hassio/addon/{{ haaddon }}/config" type="button" class="btn btn-outline-primary" target=_new >Config</a>{% endif %}
+                {% if haaddon != "" %}<a href="/hassio/addon/{{ haaddon }}/config" type="button" class="btn btn-outline-primary" target="_top" >Config</a>{% endif %}
                 </div>
             </div>
             <div class="col-4">&nbsp;</div>
