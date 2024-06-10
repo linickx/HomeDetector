@@ -56,7 +56,7 @@ else:
         logger.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         OPTIONS_DATA = {}
 
-DEBUG_MODE = False      # Default => INFO
+DEBUG_MODE = True      # Default => INFO
 try:
     DEBUG_MODE = bool(OPTIONS_DATA['debug'])
 except Exception:
@@ -296,6 +296,7 @@ class DNSInterceptor(BaseResolver):
                     except Exception:
                         self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                         self.log.error(traceback.format_exc())
+                    self.sql_connection.commit()
                     sql_cursor.close()
             else:
                 action = sql_rows[0][1]
