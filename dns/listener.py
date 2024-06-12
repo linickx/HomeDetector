@@ -177,8 +177,17 @@ CONFIG_DB_NAME = "hd.db"        # Later, this should be user config
 
 # CLasses & Functions...
 class DNSInterceptor(BaseResolver):
+    """
+        Extension of BaseResolver, customised for Home Detector
+    """
 
     def __init__(self,upstream:list,timeout:float=5, dnsi_logger:logging=logging, local_ips:list=None):
+        """
+            * upstream: List of Upstream Resolvers
+            * timeout: Default DNS Timeout
+            * dnsi_logger: python logging object
+            * local_ips: IPs configured in Home Assistant
+        """
         self.log = dnsi_logger
 
         self.resolvers = self.__loadResolvers(upstream)
@@ -219,8 +228,8 @@ class DNSInterceptor(BaseResolver):
         """
             Create netaddr scope object from Type/IP
 
-            scope_type:str  -> host | network | range
-            scope_ip:str    -> 192.168.0.1 | 192.168.1.0/24 | 192.168.2.1-192.168.2.2
+            * scope_type:str  -> host | network | range
+            * scope_ip:str    -> 192.168.0.1 | 192.168.1.0/24 | 192.168.2.1-192.168.2.2
         """
         scope = netaddr.IPSet() # <- Empty IP Set
 
@@ -307,7 +316,12 @@ class DNSInterceptor(BaseResolver):
 
     def learningModeReValidation(self, scope_id, current_action, created, ttl=None):
         """
-            Periodically ReValidate the status of a Network Against the DB/
+            Periodically ReValidate the status of a Network Against the DB
+
+            * scope_id: Scope we are checking
+            * current_action: current action (learn or block)
+            * created: timestamp of scope creation
+            * ttl: timestamp of last check
         """
         action = current_action
         now = datetime.datetime.now(datetime.UTC)
@@ -362,7 +376,10 @@ class DNSInterceptor(BaseResolver):
 
     def sqlKnownHosts(self, source_ip:str=None, scope_id:str=None):
         """
-            Record Source IPs with their Scope ID so we can give them friendlt names later :)
+            Record Source IPs with their Scope ID so we can give them friendly names later :)
+
+            * source_ip: Source IP
+            * scope_id: scope ID :)
         """
 
         with self.lock:
@@ -395,8 +412,10 @@ class DNSInterceptor(BaseResolver):
         """
             Check if Source IP is in Learning More or Not
 
-            # False => Block
-            # True => Pass
+            * False => Block
+            * True => Pass
+
+            source_ip: IP to check
 
         """
         self.log.debug("Source IP -> %s", source_ip)
@@ -428,7 +447,7 @@ class DNSInterceptor(BaseResolver):
             1. action/block => False
             2. action/else (pass) => True
             ### Return
-            # Bool
+            * Bool
 
         """
         self.log.debug("SQL -> %s", action)
@@ -686,7 +705,7 @@ class DNSInterceptor(BaseResolver):
 
     def linkSQLs(self, source_ip:str=None, scope_id:str=None, query_name:str=None, query_type:str=None, the_domain_id:str=None):
         """
-            Link a Query to a Domain
+            Link a Query to a Domain (in SQL)
         """
         self.log.debug('%s (%s) -> %s (%s) => %s', source_ip, scope_id, query_name, query_type, the_domain_id)
 
@@ -736,7 +755,9 @@ class DNSInterceptor(BaseResolver):
             ## From the query, send a new DNS Request (SOA) to find the domain name of the host/domainname.
             REF: https://github.com/paulc/dnslib/blob/master/dnslib/client.py
             ### Input:
-            * domainname => Host or Domainname to find the authorative domain
+            * domain_query => Host or Domainname to find the authorative domain
+            * scope_id => sope of source IP (used for SQL, create new records)
+            * learning_mode: => scope status (used for SQL, above)
             ### Return:
             * the domain:str ... or None for failed.
         """
