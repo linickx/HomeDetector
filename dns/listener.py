@@ -56,7 +56,7 @@ else:
         logger.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
         OPTIONS_DATA = {}
 
-DEBUG_MODE = True      # Default => INFO
+DEBUG_MODE = False      # Default => INFO
 try:
     DEBUG_MODE = bool(OPTIONS_DATA['debug'])
 except Exception:
@@ -1049,7 +1049,10 @@ def main(dnsi_logger):
         postwebhook({'type':'dns', 'logdata':{'msg':'TCP DNS Server Started'}})
 
     while udp_server.isAlive():
-        time.sleep(1)
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            sys.exit() # CTRL-C Quietly
 
 if __name__ == "__main__":
     main_logger = logging.getLogger("DNSInterceptor")
