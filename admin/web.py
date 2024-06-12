@@ -282,7 +282,7 @@ class DataDNSDomainsPage(Resource):
         if update_name not in ['action']:
             return (status)
 
-        if update_name == "action" and update_value not in ['learn', 'block']:
+        if update_name == "action" and update_value not in ['pass', 'block']:
             return (status)
 
         try:
@@ -360,7 +360,7 @@ class DataDNSQueriesPage(Resource):
         if update_name not in ['action']:
             return (status)
 
-        if update_name == "action" and update_value not in ['learn', 'block']:
+        if update_name == "action" and update_value not in ['pass', 'block']:
             return (status)
 
         try:
