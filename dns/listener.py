@@ -326,7 +326,7 @@ class DNSInterceptor(BaseResolver):
                 sql_cursor = self.sql_connection.cursor()
                 try:
                     sql_cursor.execute(   # Update the existing Row
-                        f'UPDATE "{DB_T_NETWORKS}" SET "action" = ?, WHERE "id" = ?', (action, scope_id)
+                        f'UPDATE "{DB_T_NETWORKS}" SET "action" = ? WHERE "id" = ?', (action, scope_id)
                     )
                 except Exception:
                     self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
