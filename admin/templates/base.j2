@@ -55,7 +55,7 @@
 <script src='{{ haurl }}static/js/bootstrap.bundle.min.js' integrity='sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz' crossorigin='anonymous' ></script>
 <script src='{{ haurl }}static/js/bootstrap-table.min.js' integrity='sha384-pmdxQX3bO3B7lHCwvVeRyhYIBGMVQt1XUJCGydHYJSFkQqU7/QxrLsC4u2a6D5PR' crossorigin='anonymous' ></script>
 <script src='{{ haurl }}static/js/bootstrap-auto-dark-mode.js' integrity='sha384-s+JSTy6PqcAoBx4cKTr5AdP+flis24w0tMk/+9U+99YRKwDmP7235WXT9dUupaXj' crossorigin='anonymous'></script>
-{% if active == "tuning" %}
+{% if active == "tuning" or active == "dns" %}
 <script src="{{ haurl }}static/js/bootstrap-table-editable.js"></script>
 <script src="{{ haurl }}static/js/bootstrap-editable.min.js"></script>
 {% endif %}

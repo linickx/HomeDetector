@@ -261,6 +261,41 @@ class DataDNSDomainsPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         return DataDNSDomainsPage()
 
+    def render_POST(self, request):
+        status = b"Update Failed"
+        logger.debug("DOMAINS POST String -> %s", request.args)
+
+        try:
+            update_name = request.args[b'name'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        try:
+            update_value = request.args[b'value'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if update_name not in ['action']:
+            return (status)
+
+        if update_name == "action" and update_value not in ['learn', 'block']:
+            return (status)
+
+        try:
+            network_id = request.args[b'pk'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if not sql_action(f'UPDATE "{DB_T_DOMAINS}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, network_id)):
+            return (status)
+        return b'Ok'
+
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action', 'scope'])
@@ -303,6 +338,41 @@ class DataDNSDomainsPage(Resource):
 class DataDNSQueriesPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         return DataDNSQueriesPage()
+
+    def render_POST(self, request):
+        status = b"Update Failed"
+        logger.debug("QUERIES POST String -> %s", request.args)
+
+        try:
+            update_name = request.args[b'name'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        try:
+            update_value = request.args[b'value'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if update_name not in ['action']:
+            return (status)
+
+        if update_name == "action" and update_value not in ['learn', 'block']:
+            return (status)
+
+        try:
+            network_id = request.args[b'pk'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if not sql_action(f'UPDATE "{DB_T_QUERIES}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, network_id)):
+            return (status)
+        return b'Ok'
 
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)

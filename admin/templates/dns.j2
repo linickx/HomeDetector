@@ -20,6 +20,7 @@
         data-search="true"
         data-searchable="true"
         data-url="{{ haurl }}admin/data/dns/domains"
+        data-editable-url="{{ haurl }}admin/data/dns/domains"
         data-id-field="id"
         data-sort-name="counter"
         data-sort-order="desc">
@@ -30,7 +31,7 @@
             <th data-field="scope" data-sortable="true">Scope</th>
             <th data-field="domain" data-sortable="true">Domain</th>
             <th data-field="counter" data-sortable="true">Hit Count</th>
-            <th data-field="action" data-sortable="true">Action</th>
+            <th data-field="action" data-editable="true" data-sortable="true">Action</th>
             </tr>
         </thead>
     </table>
@@ -45,6 +46,8 @@
         data-search="true"
         data-searchable="true"
         data-url="{{ haurl }}admin/data/dns/queries"
+        data-editable-url="{{ haurl }}admin/data/dns/queries"
+        data-id-field="id"
         data-sort-name="counter"
         data-sort-order="desc">
         <thead>
@@ -57,7 +60,7 @@
             <th data-field="src" data-sortable="true">Source IP</th>
             <th data-field="scope" data-sortable="true">Scope</th>
             <th data-field="counter" data-sortable="true">Hit Count</th>
-            <th data-field="action" data-sortable="true">Action</th>
+            <th data-field="action" data-editable="true" data-sortable="true">Action</th>
             </tr>
         </thead>
     </table>
