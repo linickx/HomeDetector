@@ -908,10 +908,10 @@ class Webhook(Resource):
         logger.debug("Post JSON/DICT -> %s", data)
 
         try:
-            if data['type'] == "opencanary":                        # Step 3 - Did we get expected formatted JSON? (canary alert)
+            if data['type'] == "opencanary":                    # Step 3 - Did we get expected formatted JSON? (canary alert)
                 return self.__process_canary(json.loads(data['message']))
 
-            if data['type'] == "dns":                               # Step3 - DNS Anomonly Alert
+            if data['type'] == "dns":                           # Step3,still - DNS Anomonly Alert
                 return self.__process_dns(data)
         except KeyError:
             return ( b"Ooops \n")
