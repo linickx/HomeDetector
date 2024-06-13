@@ -218,7 +218,13 @@ class AdminRoot(Resource):
         This is the route processesor for /admin and it's child pages
         The path requested gets sent to the relevant child's class
     """
-    def getChild(self, path, request): # pylint: disable=W0613
+    def getChild(self, path, request):
+        request_src_ip = request.transport.getPeer().host
+        logger.debug('Source IP -> %s ', request_src_ip)                # Source IP filtering for Security
+        if request_src_ip not in ("127.0.0.1", "172.30.32.2"):          # Localhost & Ingress Only
+            logger.error("IP Blocked by Firewall %s", request_src_ip)   # https://developers.home-assistant.io/docs/add-ons/presentation#ingress
+            return WebRootPage()
+
         path_str = path.decode('utf-8')
         logger.debug("Admin Path -> %s", path_str)
         if path_str == "data":
@@ -232,6 +238,12 @@ class AdminRoot(Resource):
         return AdminPage()
 
     def render_GET(self, request):
+        request_src_ip = request.transport.getPeer().host
+        logger.debug('Source IP -> %s ', request_src_ip)
+        if request_src_ip not in ("127.0.0.1", "172.30.32.2"):
+            logger.error("IP Blocked by Firewall %s", request_src_ip)
+            return WebRootPage().render_GET(request)
+
         # no child.
         return AdminPage().render_GET(request)
 
@@ -869,8 +881,13 @@ class Webhook(Resource):
         """
             Handle our Post Requests
         """
-        request_src_ip = request.transport.getPeer().host       # TODO: ADD IP ACL
+        request_src_ip = request.transport.getPeer().host
         logger.debug('Source IP -> %s ', request_src_ip)        # Need to filter by Source IP for Security
+        if request_src_ip != "127.0.0.1":                       # Only accept localhost (listener.py & opencanary)
+            if DEBUG_MODE:                                      # Maybe I should create an alert, is this an attack?!
+                return (b"Firewalled " + request_src_ip.encode('utf-8') + "\n".encode('utf-8'))
+            logger.error("IP Blocked by Firewall %s", request_src_ip)
+            return ( b"No \n")
 
         try:
             args = request.content.getvalue().decode('utf8')    # Step1 - Do we have any posted arguments?
@@ -890,11 +907,14 @@ class Webhook(Resource):
 
         logger.debug("Post JSON/DICT -> %s", data)
 
-        if data['type'] == "opencanary":                        # Step 3 - Did we get expected formatted JSON? (canary alert)
-            return self.__process_canary(json.loads(data['message']))
+        try:
+            if data['type'] == "opencanary":                        # Step 3 - Did we get expected formatted JSON? (canary alert)
+                return self.__process_canary(json.loads(data['message']))
 
-        if data['type'] == "dns":                               # Step3 - DNS Anomonly Alert
-            return self.__process_dns(data)
+            if data['type'] == "dns":                               # Step3 - DNS Anomonly Alert
+                return self.__process_dns(data)
+        except KeyError:
+            return ( b"Ooops \n")
 
         if DEBUG_MODE:
             return ( b"-> " + args.encode('utf-8') + "\n".encode('utf-8'))
