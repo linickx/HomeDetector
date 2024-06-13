@@ -150,7 +150,13 @@ logger.info('HOSTANME -> %s', HA_ADDON_NAME)
 
 # To class children!
 class WebRootPage(Resource):
+    """
+        Default web page http://<IP>:<port>/
+    """
     def render_GET(self, request): # pylint: disable=W0613
+        """
+            Return generic static page.
+        """
         return (
             b"<!DOCTYPE html><html lang='en' data-bs-theme='auto'><head>"
             b"<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
@@ -161,10 +167,16 @@ class WebRootPage(Resource):
             )
 
 class WebRoot(Resource):
+    """
+        Send all unknown requests to the generic static page
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return WebRootPage()
 
 class AdminPage(Resource):
+    """
+        http://<IP>:<port>/admin <- The Ingres admin portal for Home Assistant
+    """
     def render_GET(self, request):
         host_url = get_host_url(request, "admin")
         admin_template = J2_ENV.get_template('admin.j2')
@@ -175,6 +187,9 @@ class AdminPage(Resource):
             )
 
 class DNSPage(Resource):
+    """
+        http://<IP>:<port>/dns <- the DNS Log File page (Domains & Queries)
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return DNSPage()
 
@@ -185,6 +200,10 @@ class DNSPage(Resource):
         return (output.encode('utf-8'))
 
 class TuningPage(Resource):
+    """
+        http://<IP>:<port>/tuning <- the Networks & Hosts page (For Block/Learn)
+    """
+
     def getChild(self, path, request): # pylint: disable=W0613
         return TuningPage()
 
@@ -195,6 +214,10 @@ class TuningPage(Resource):
         return (output.encode('utf-8'))
 
 class AdminRoot(Resource):
+    """
+        This is the route processesor for /admin and it's child pages
+        The path requested gets sent to the relevant child's class
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         path_str = path.decode('utf-8')
         logger.debug("Admin Path -> %s", path_str)
@@ -213,10 +236,16 @@ class AdminRoot(Resource):
         return AdminPage().render_GET(request)
 
 class DataAlertsPage(Resource):
+    """
+        /admin/data/alerts <- JSON Data management for the Alerts Table
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return DataAlertsPage()
 
     def render_GET(self, request):
+        """
+            Render a JSON page, paramaters are used for search & sort
+        """
         # Sanitise our Inputs...
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "timestamp", ['id', 'timestamp', 'type', 'src_ip', 'message'])
@@ -233,7 +262,7 @@ class DataAlertsPage(Resource):
                 sql_where = " WHERE ((timestamp||type||src_ip||message) LIKE ?) "
                 sql_params = (search_string, search_string, limit, offset)
 
-        # SQL Injection away!
+        # SQL ~Injection~ away!
         data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}{sql_where}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         total = 0
@@ -258,10 +287,16 @@ class DataAlertsPage(Resource):
         return json.dumps(response).encode('utf-8')
 
 class DataDNSDomainsPage(Resource):
+    """
+        /admin/data/dns/domains <- JSON Data management for the DNS Domains Table
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return DataDNSDomainsPage()
 
     def render_POST(self, request):
+        """
+            Process Javascript submissions (i.e. changing pass to block)
+        """
         status = b"Update Failed"
         logger.debug("DOMAINS POST String -> %s", request.args)
 
@@ -297,6 +332,9 @@ class DataDNSDomainsPage(Resource):
         return b'Ok'
 
     def render_GET(self, request):
+        """
+            Render a JSON page, paramaters are used for search & sort
+        """
         limit, offset = get_limit_offset(request)
         sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action', 'scope'])
 
@@ -336,6 +374,9 @@ class DataDNSDomainsPage(Resource):
         return json.dumps(response).encode('utf-8')
 
 class DataDNSQueriesPage(Resource):
+    """
+        /admin/data/dns/queries <- JSON Data management for the DNS Queries Log/Table
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return DataDNSQueriesPage()
 
@@ -417,6 +458,9 @@ class DataDNSQueriesPage(Resource):
         return json.dumps(response).encode('utf-8')
 
 class DataDNSRoot(Resource):
+    """
+        Route Processor for /admin/data/dns/domains & /admin/data/dns/queries
+    """
     def getChild(self, path, request):
         path_str = path.decode('utf-8')
         logger.debug("Data/DNS Path -> %s with => %s", path_str, request.args)
@@ -432,6 +476,9 @@ class DataDNSRoot(Resource):
         return (b'{"data":"dns"}')
 
 class DataTuningHostPage(Resource):
+    """
+        /admin/data/tuning/hosts <- JSON Data management for the Host File (Table)
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return DataTuningHostPage()
 
@@ -502,6 +549,9 @@ class DataTuningHostPage(Resource):
         return json.dumps(response).encode('utf-8')
 
 class DataTuningNetworkPage(Resource):
+    """
+        /admin/data/tuning/networks <- JSON Data management for network (scope) management
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         return DataTuningNetworkPage()
 
@@ -578,6 +628,9 @@ class DataTuningNetworkPage(Resource):
         return json.dumps(response).encode('utf-8')
 
 class DataTuningRoot(Resource):
+    """
+        Route processor for /admin/data/tuning/
+    """
     def getChild(self, path, request):
         path_str = path.decode('utf-8')
         logger.debug("Data/Tuning Path -> %s with => %s", path_str, request.args)
@@ -592,6 +645,9 @@ class DataTuningRoot(Resource):
         return (b'{"data":"tuning"}')
 
 class DataRoot(Resource):
+    """
+        Route processor for /admin/data/
+    """
     def getChild(self, path, request): # pylint: disable=W0613
         path_str = path.decode('utf-8')
         logger.debug("Data Path -> %s with => %s", path_str, request.args)
@@ -636,7 +692,7 @@ class Webhook(Resource):
 
     def __sqlSave(self, alert:dict=None):
         """
-            Insert into DB
+            Wrapper for Insert into DB, and upstream webhook posts
         """
         logger.debug(alert)
         logger.info("🔥🔥 %s 🔥🔥", alert['message'])
@@ -650,11 +706,14 @@ class Webhook(Resource):
         return status
 
     def __process_dns(self, alert:dict=None):
+        """
+            Decode & Process JSON submissions where 'type' = dns
+        """
         logger.debug(alert)
-        status = b"Failed \n"
+        status = b"Failed \n"                           # <- Return failed is people F8ck with data input
 
         try:
-            logdata_msg = alert['logdata']['msg']
+            logdata_msg = alert['logdata']['msg']       # <- Startup notifications, not security alerts
         except Exception:
             pass
         else:
@@ -662,7 +721,7 @@ class Webhook(Resource):
             return b"ok \n"
 
         try:
-            alert_type = alert['alert_type']
+            alert_type = alert['alert_type']            # <- Now we're on Security Alerts!
         except Exception:
             logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             logger.error(traceback.format_exc())
@@ -696,6 +755,7 @@ class Webhook(Resource):
             logger.error(traceback.format_exc())
             return status
 
+        # Format our resulting message differently based on type of Alert...
         if alert_type == "dns-domain":
             message = f"Domain anomaly {domain} from {src_ip} for lookup {query}"
         elif alert_type == "dns-query":
@@ -714,21 +774,21 @@ class Webhook(Resource):
             'unread': 1
         }
 
-        if self.__sqlSave(sql_data):
+        if self.__sqlSave(sql_data):                # Save the alert
             status = b"ok \n"
 
         return status
 
     def __process_canary(self, alert:dict=None):
         """
-            Convert what we got into standard format..
+            Convert what we got from OpenCanary into standard format for our Home Detector database & Home Assistant Alerts..
         """
         logger.debug(alert)
         status = b"Failed \n"
 
         try:
-            logdata_msg = alert['logdata']['msg']
-        except Exception:
+            logdata_msg = alert['logdata']['msg']       # Open Canary tests the webhook to see if it's there
+        except Exception:                               # Log startup messages to screen, but not our Database
             pass
         else:
             logger.info("🍯 -> %s", str(logdata_msg))
@@ -741,8 +801,8 @@ class Webhook(Resource):
             logger.error(traceback.format_exc())
             return status
 
-        canary_utc_time = canary_utc_time.replace(tzinfo=datetime.UTC)  # Add Timezone
-        timestamp = canary_utc_time.isoformat(timespec='seconds')       # Standardise to my format
+        canary_utc_time = canary_utc_time.replace(tzinfo=datetime.UTC)  # Add Timezone (OFFSET)
+        timestamp = canary_utc_time.isoformat(timespec='seconds')       # Standardise to my format ISO 8601 (YYYY-MM-DDTHH:MM:SS+OFFSET)
 
         try:
             alert_type = f"canary-p{alert['dst_port']}"
@@ -762,8 +822,8 @@ class Webhook(Resource):
 
         poos_like_honey = ""
         try:
-            if alert['honeycred']:
-                poos_like_honey = "Honey "
+            if alert['honeycred']:                      # Honey creds are username/password pairs that generate special alerts
+                poos_like_honey = "Honey "              # I might use this later, seems like a cool detection method
         except KeyError:
             pass # Honey Cred not set, use blank.
 
@@ -806,11 +866,14 @@ class Webhook(Resource):
         return status
 
     def render_POST(self, request):
-        request_src_ip = request.transport.getPeer().host
-        logger.debug('Source IP -> %s ', request_src_ip)
+        """
+            Handle our Post Requests
+        """
+        request_src_ip = request.transport.getPeer().host       # TODO: ADD IP ACL
+        logger.debug('Source IP -> %s ', request_src_ip)        # Need to filter by Source IP for Security
 
         try:
-            args = request.content.getvalue().decode('utf8')
+            args = request.content.getvalue().decode('utf8')    # Step1 - Do we have any posted arguments?
         except Exception:
             logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             logger.error(traceback.format_exc())
@@ -818,7 +881,7 @@ class Webhook(Resource):
 
         logger.debug("POST String -> %s", args)
 
-        try:
+        try:                                                    # Step2 - Did we get JSON arguments?
             data = json.loads(args)
         except Exception:
             logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
@@ -827,19 +890,22 @@ class Webhook(Resource):
 
         logger.debug("Post JSON/DICT -> %s", data)
 
-        if data['type'] == "opencanary":
+        if data['type'] == "opencanary":                        # Step 3 - Did we get expected formatted JSON? (canary alert)
             return self.__process_canary(json.loads(data['message']))
 
-        if data['type'] == "dns":
+        if data['type'] == "dns":                               # Step3 - DNS Anomonly Alert
             return self.__process_dns(data)
 
         if DEBUG_MODE:
             return ( b"-> " + args.encode('utf-8') + "\n".encode('utf-8'))
 
-        return ( b"echo reply \n")
+        return ( b"echo reply \n")                              # At this point, garbage was submitted, so return garbage.
 
 
     def render_GET(self, request):
+        """
+            Notification Webhook doesn't support GETs, must be POSTS, return generic HTML (not even JSON!)
+        """
         request_src_ip = request.transport.getPeer().host
         logger.debug('Source IP -> %s ', request_src_ip)
         return (
@@ -991,7 +1057,7 @@ def get_host_url(request, path=None):
 
 def get_limit_offset(request):
     """
-        Parse Args, return ints
+        Sanitise/Parse Args, return Integers (for Offset & Limit)
     """
     try:
         limit = int(request.args[b'limit'][0].decode('utf-8')) # <- Whatever it is submitted, is rendered an INT :)
@@ -1005,8 +1071,12 @@ def get_limit_offset(request):
 
     return limit, offset
 
-def get_sort_n_order(request, default_sort, allow_list):
+def get_sort_n_order(request, default_sort:str=None, allow_list:list=None):
     """
+        Sanitise/Parse Args. Apply an ACL to Sorting.
+        * default_sort -> Returned if request is outside the allow_list
+        * allow_list -> things that we accept sorting on
+        * order -> will return either asc or dsc regardless of what else is submitted
     """
     sort = default_sort
     try:
@@ -1027,11 +1097,19 @@ def get_sort_n_order(request, default_sort, allow_list):
             order = danger_order
     return sort, order
 
-def sql_action(sql_str, sql_param):
+def sql_action(sql_str:str=None, sql_param=None):
+    """
+        SQL Wrapper for all SQL Actions
 
+        Requires Paramaratised Inputs to protect against SQL Injection Attacks
+    """
     logger.debug('SQL STR -> %s', sql_str)
     logger.debug('SQL PARAM -> %s', sql_param)
-    lock = threading.Lock()
+
+    if sql_param is None:
+        return False
+
+    lock = threading.Lock() # SQL Lite does not allow for Multi-thread read/writes, so we Lock to our thread...
     try:
         sql_connection = sqlite3.connect(f"{CONFIG_DB_PATH}/{CONFIG_DB_NAME}", check_same_thread=False)
         sql_cursor = sql_connection.cursor()
@@ -1040,7 +1118,7 @@ def sql_action(sql_str, sql_param):
         logger.error(traceback.format_exc())
         return False
 
-    with lock:
+    with lock:  # SQL Syntax Format based on Select or INSERT/UDPATE
         try:
             if re.search('SELECT', sql_str, re.IGNORECASE):
                 result = sql_cursor.execute(sql_str, sql_param).fetchall()
@@ -1053,7 +1131,7 @@ def sql_action(sql_str, sql_param):
 
         sql_cursor.close()
 
-    with lock:
+    with lock:  # SQL Write
         try:
             sql_connection.commit()
         except Exception:
@@ -1073,11 +1151,11 @@ if __name__ == "__main__":
         observer = log.PythonLoggingObserver(loggerName="HomeAssistant")
         observer.start()
 
-    root = WebRoot()
-    root.putChild(b"static", File(STATIC_FILES))
-    root.putChild(b"admin", AdminRoot())
-    root.putChild(b"notify", Webhook())
+    root = WebRoot()                                        # http://<IP>:<PORT>/
+    root.putChild(b"static", File(STATIC_FILES))            # Static files, CSS, JS, IMG, etc <- http://<IP>:<PORT>/static
+    root.putChild(b"admin", AdminRoot())                    # Processor for http://<IP>:<PORT>/admin
+    root.putChild(b"notify", Webhook())                     # Processor for http://<IP>:<PORT>/notify
     factory = Site(root)
-    endpoint = endpoints.TCP4ServerEndpoint(reactor, 8099)
+    endpoint = endpoints.TCP4ServerEndpoint(reactor, 8099)  # 8099 is the Home Assistant ingress port (Default they expect)
     endpoint.listen(factory)
     reactor.run() # pylint: disable=E1101
