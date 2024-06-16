@@ -33,7 +33,7 @@ Thank you world of Open-Source, this project would be nowhere without you. Notab
 
 * [Michael Irigoyen](https://pictogrammers.com/contributor/mririgoyen/) for the Logo (_Material Design Icon_)
 * Paul for publishing [dnslib](https://github.com/paulc/dnslib)
-* [Thinkst](https://canary.tools/) for publishing [OpenCanary](https://opencanary.readthedocs.io/)
+* [OpenCanary](https://opencanary.readthedocs.io/)
 * [Mark Otto and team](https://getbootstrap.com/docs/5.3/about/team/) for [Bootstrap](https://getbootstrap.com)
 * [文翼 (wenzhixin)](https://github.com/wenzhixin) for [bootstrap-table](https://bootstrap-table.com)
 * [Stefan Haack](https://shaack.com) for [bootstrap-auto-darkmode](https://github.com/shaack/bootstrap-auto-dark-mode)
