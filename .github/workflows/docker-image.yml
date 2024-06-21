@@ -22,5 +22,6 @@ jobs:
         with:
           args: |
             --all \
+            --target homedetector
             --docker-user ${{ vars.DOCKERHUB_USERNAME }} \
             --docker-password ${{ secrets.DOCKERHUB_TOKEN }}
