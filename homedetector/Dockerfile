@@ -4,7 +4,7 @@ FROM $BUILD_FROM
 # DNS Listener APKs
 RUN apk add --no-cache python3 py3-pip py3-virtualenv
 # OpenCanary APKs
-RUN apk add --no-cache python3-dev bash gcc build-base libffi-dev
+RUN apk add --no-cache python3-dev bash gcc build-base libffi-dev openssl-dev
 
 # Python Deps, per module (tmp)
 COPY dns/requirements.txt /tmp/dns.requirements.txt
