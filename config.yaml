@@ -10,6 +10,7 @@ arch:
   - armhf
   - armv7
   - i386
+image: linickx/addon-homedetector-{arch}
 startup: application
 map:
   - addon_config:rw
