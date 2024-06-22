@@ -17,11 +17,9 @@ jobs:
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish
+      - name: Build & Publish
         uses: home-assistant/builder@master
         with:
           args: |
             --all \
             --target homedetector
-            --docker-user ${{ vars.DOCKERHUB_USERNAME }} \
-            --docker-password ${{ secrets.DOCKERHUB_TOKEN }}
