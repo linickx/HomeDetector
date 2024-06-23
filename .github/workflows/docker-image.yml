@@ -1,4 +1,4 @@
-name: Image
+name: Imge
 
 on:
   push:
@@ -7,19 +7,39 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  init:
+    name: Initialize build
     runs-on: ubuntu-latest
+    outputs:
+      architectures: ${{ steps.info.outputs.architectures }}
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+
+  build:
+    name: Publish builder
+    needs: init
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: False
+      matrix:
+        architecture: ${{ fromJson(needs.init.outputs.architectures) }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build & Publish
+      - name: Publish
         uses: home-assistant/builder@master
         with:
           args: |
-            --all \
-            --target homedetector
+            --${{ matrix.architecture }} \
+            --image  addon-homedetector-${{ matrix.architecture }} \
+            --target /data/ \
+            --docker-hub linickx
