@@ -41,3 +41,5 @@ If you'd rather download the code and install that way:
 4. Copy the contents of `homedetector-main` to `/addons/homedetector`. e.g. `scp -r ./homedetector-main/* root@homeassistant.local:/addons/homedetector/`
 5. On the Home Assistant Web GUI: Settings -> Add-ons -> ADD-ON STORE
 6. In the top right, select _Check for Updates_
+7. Refresh the page/browser
+8. Select _Home Detector_ and ___INSTALL___
