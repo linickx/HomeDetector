@@ -2,6 +2,8 @@
 
 A lightweight intrusion detector for Home Assistant
 
+> See [INSTALL.md](docs/INSTALL.md) for installation instructions.
+
 ## 🔥 DNS Anomaly Detection for IoT Devices 🔥
 
 Setup dedicated monitoring scopes for your home IOT devices and track their DNS usage.
