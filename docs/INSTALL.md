@@ -6,9 +6,11 @@
 
 Home Detector can be installed via Home Assistant's Add-on Store, to update your store either use the one-click or manually add the repository.
 
+![Screenshot of LINICKX Addons](https://github.com/linickx/ha-addons/blob/main/img/ha-repo.png?raw=true)
+
 ### One Click
 
-The button below uses https://my.home-assistant.io to add my repository to your store, if you have not use my.home-assistiant URLs before, the first time you visit it will ask for your Home Assistant URL, change if necessary, this is then stored as a cookie for future use.
+The button below uses https://my.home-assistant.io to add my repository to your store, if you have not use my.home-assistant URLs before, the first time you visit it will ask for your Home Assistant URL, change if necessary, this is then stored as a cookie for future use.
 
 [![Add Nicks LINICKX repository too your Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Flinickx%2Fha-addons)
 
