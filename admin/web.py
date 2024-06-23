@@ -85,8 +85,8 @@ if HA_NOTIFY or HA_WEBHOOK is not None:
 logger.info('📨 Home Assistant Notifications => %s', str(HA_NOTIFY))
 
 # Initial Config vars.
-if os.path.exists("/share/"):           # <- Revert addon_configs when done.
-    CONFIG_DB_PATH = "/share/"
+if os.path.exists("/config/"):
+    CONFIG_DB_PATH = "/config/"
 else:
     CONFIG_DB_PATH = "./"               # Make config option
 
