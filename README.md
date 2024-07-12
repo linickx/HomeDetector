@@ -3,6 +3,7 @@
 A lightweight intrusion detector for Home Assistant
 
 > See [INSTALL.md](docs/INSTALL.md) for installation instructions.
+> By default only a Telnet Honeypot is enabled, for more advanced detections see [Docs.md](https://github.com/linickx/ha-addons/blob/main/homedetector/DOCS.md)
 
 ## 🔥 DNS Anomaly Detection for IoT Devices 🔥
 

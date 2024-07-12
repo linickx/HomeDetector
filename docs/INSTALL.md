@@ -1,6 +1,6 @@
 # Installation Instructions
 
-🚨 Warning: Home Detector is only support on 64bit processors, i.e. x86_64 (`amd64`) or ARM64 (`aarch64`) this is due to modern cryptography libraries (_used by Open Canary_) requiring rust which is not provided in the base python/alpine 32bit docker images. For Raspberry Pi users, that means Pi 4 or newer.
+By installing Home Detector, and performing no configuration at all you will have successfully deployed a Telnet honeypot onto your network which will alert when a threat tries to log in. For more advanced detections see [Docs.md](https://github.com/linickx/ha-addons/blob/main/homedetector/DOCS.md)
 
 ## Install via Add-on Store (with custom repository)
 
@@ -43,3 +43,7 @@ If you'd rather download the code and install that way:
 6. In the top right, select _Check for Updates_
 7. Refresh the page/browser
 8. Select _Home Detector_ and ___INSTALL___
+
+## Any Other Business
+
+🚨 Warning: Home Detector is only support on 64bit processors, i.e. x86_64 (`amd64`) or ARM64 (`aarch64`) this is due to modern cryptography libraries (_used by Open Canary_) requiring rust which is not provided in the base python/alpine 32bit docker images. For Raspberry Pi users, that means Pi 4 or newer.
