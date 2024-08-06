@@ -1,4 +1,4 @@
-## Contributing to Home Detector
+## Contributing to Home Detector
 
 > 🔥 CHANGE FREEZE IN PLACE UNTIL X-MAS 🔥  
 > This project is part of an academic submission, pull-requests welcomed but merges on hold until marking is completed
