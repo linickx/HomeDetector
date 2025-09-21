@@ -1,1 +1,1 @@
-opencanary==0.9.3
+opencanary==0.9.6
