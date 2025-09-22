@@ -17,8 +17,18 @@ done
 
 echo "Starting the Admin Web Server..."
 python3 /app/web.py &
+
+if [ ! -f /config/opencanary.conf ]; then
+    echo "👉🏼 Writing default opencanary.conf"
+	cp /etc/opencanaryd/opencanary.conf /config/opencanary.conf
+else
+    # Copy HomeAssistant Config to opencanary location
+    cp /config/opencanary.conf /etc/opencanaryd/opencanary.conf
+fi
 sleep 1
 echo "Starting the HoneyPot (OpenCanary)..."
 opencanaryd --start
+
+sleep 1
 echo "Starting the DNS Listener..."
 python3 /app/listener.py
