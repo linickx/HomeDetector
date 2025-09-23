@@ -16,6 +16,14 @@ ports:
   23/tcp: 23
   21/tcp:
   80/tcp:
+  9418/tcp:
+  8080/tcp:
+  3306/tcp:
+  6379/tcp:
+  3389/tcp:
+  5060/tcp:
+  1433/tcp:
+  5000/tcp:
 ingress: true
 ingress_entry: admin
 panel_icon: mdi:home-search-outline
