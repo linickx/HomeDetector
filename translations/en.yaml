@@ -42,3 +42,11 @@ network:
   23/tcp: HoneyPot Telnet Port
   21/tcp: HoneyPot FTP Port
   80/tcp: HoneyPot (Fake) WebServer Port
+  9418/tcp: HoneyPot Git Port
+  8080/tcp: HoneyPot HTTP Proxy Port
+  3306/tcp: HoneyPot MySQL Port
+  6379/tcp: HoneyPot Redis Port
+  3389/tcp: HoneyPot RDP Port
+  5060/tcp: HoneyPot SIP Port
+  1433/tcp: HoneyPot MSSQL Port
+  5000/tcp: HoneyPot VNC Port
