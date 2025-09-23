@@ -5,6 +5,10 @@ A lightweight intrusion detector for Home Assistant
 > See [INSTALL.md](docs/INSTALL.md) for installation instructions.
 > By default only a Telnet Honeypot is enabled, for more advanced detections see [Docs.md](https://github.com/linickx/ha-addons/blob/main/homedetector/DOCS.md)
 
+#### Related blog posts:
+1. [Running Open Canary on Home Assistant](https://www.linickx.com/honeypot-running-open-canary-on-home-assistant)
+2. [IoT DNS Anomaly Detection with Home Detector](https://www.linickx.com/iot-dns-anomaly-detection-with-home-detector)
+
 ## 🔥 DNS Anomaly Detection for IoT Devices 🔥
 
 Setup dedicated monitoring scopes for your home IOT devices and track their DNS usage.
