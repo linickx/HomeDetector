@@ -1,7 +1,7 @@
 name: Home Detector
 description: A lightweight intrusion detector.
 url: https://github.com/linickx/HomeDetector
-version: "0.0.4"
+version: "0.0.5"
 slug: homedetector
 init: false
 arch:
