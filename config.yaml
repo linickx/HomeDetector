@@ -1,58 +1,58 @@
-name: Home Detector
-description: A lightweight intrusion detector.
-url: https://github.com/linickx/HomeDetector
-version: "0.0.5"
-slug: homedetector
-init: false
 arch:
-  - aarch64
-  - amd64
-startup: application
+- aarch64
+- amd64
+description: A lightweight intrusion detector.
+homeassistant_api: true
+ingress: true
+ingress_entry: admin
+init: false
 map:
-  - addon_config:rw
+- addon_config:rw
+name: Home Detector
+options:
+  custom_host_records: []
+  debug: false
+  detect_on_host_query: false
+  dns_blocking_mode: false
+  ha_notify: true
+  networks: []
+  resolvers: []
+panel_admin: true
+panel_icon: mdi:home-search-outline
 ports:
   10053/tcp: 53
   10053/udp: 53
+  1433/tcp: null
+  21/tcp: null
   23/tcp: 23
-  21/tcp:
-  80/tcp:
-  9418/tcp:
-  8080/tcp:
-  3306/tcp:
-  6379/tcp:
-  3389/tcp:
-  5060/tcp:
-  1433/tcp:
-  5000/tcp:
-ingress: true
-ingress_entry: admin
-panel_icon: mdi:home-search-outline
-panel_admin: true
-homeassistant_api: true
-options:
-  networks: []
-  resolvers: []
-  ha_notify: true
-  detect_on_host_query: false
-  dns_blocking_mode: false
-  custom_host_records: []
-  debug: false
+  3306/tcp: null
+  3389/tcp: null
+  5000/tcp: null
+  5060/tcp: null
+  6379/tcp: null
+  80/tcp: null
+  8080/tcp: null
+  9418/tcp: null
 schema:
-  networks:
-    - address: str
-      type: str
-  resolvers:
-    - server: str
-      port: int
-  networks_ttl: "int?"
-  learning_duration: "int?"
-  ha_notify: bool
-  ha_webhook_id: "str?"
-  unknown_ip_action: "str?"
-  detect_on_host_query: bool
-  soa_failure_action: "str?"
-  dns_blocking_mode: bool
   custom_host_records:
-    - name: str
-      address: str
+  - address: str
+    name: str
   debug: bool
+  detect_on_host_query: bool
+  dns_blocking_mode: bool
+  ha_notify: bool
+  ha_webhook_id: str?
+  learning_duration: int?
+  networks:
+  - address: str
+    type: str
+  networks_ttl: int?
+  resolvers:
+  - port: int
+    server: str
+  soa_failure_action: str?
+  unknown_ip_action: str?
+slug: homedetector
+startup: application
+url: https://github.com/linickx/HomeDetector
+version: 0.0.6
