@@ -55,4 +55,4 @@ schema:
 slug: homedetector
 startup: application
 url: https://github.com/linickx/HomeDetector
-version: 0.0.10
+version: 0.0.11
