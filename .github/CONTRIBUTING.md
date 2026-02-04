@@ -2,7 +2,7 @@
 
 Thank you for considering contributing, these are my thoughts on next steps...
 
-> See [AI_POLICY.md](AI_Policy.md) for use of AI within this project.
+> See [AI_POLICY.md](https://github.com/linickx/HomeDetector/blob/main/.github/AI_POLICY.md) for use of AI within this project.
 
 ## Pull Requests
 
