@@ -2,6 +2,8 @@
 
 Thank you for considering contributing, these are my thoughts on next steps...
 
+> See [AI_POLICY.md](AI_Policy.md) for use of AI within this project.
+
 ## Pull Requests
 
 I would really like to accept pull request, but before you invest your valuable time please start a discussion by raising an issue first, I may have opinions; if you don't like my opinions this project is licensed such that your are welcome to fork and start your own version. 🙃
