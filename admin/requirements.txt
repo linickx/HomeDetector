@@ -1,2 +1,2 @@
-Twisted==25.5.0
-Jinja2==3.1.6
+Twisted==24.11.0
+Jinja2==3.0.1
