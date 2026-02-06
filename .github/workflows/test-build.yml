@@ -3,7 +3,6 @@ name: Test Build
 
 on:
   workflow_dispatch:
-  webhook:
 
 jobs:
   init:
