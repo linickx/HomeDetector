@@ -1,0 +1,55 @@
+# Created by GitHub Copilot CLI on 2026-02-06
+name: Test Build
+
+on:
+  workflow_dispatch:
+  webhook:
+
+jobs:
+  init:
+    name: Initialize build
+    runs-on: ubuntu-latest
+    outputs:
+      architectures: ${{ steps.info.outputs.architectures }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+
+  test-build:
+    name: Test build for ${{ matrix.architecture }}
+    needs: init
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: ${{ fromJson(needs.init.outputs.architectures) }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Get base image from build.yaml
+        id: image
+        shell: bash
+        run: |
+          if [ "${{ matrix.architecture }}" = "amd64" ]; then
+            BUILD_FROM=$(grep -A 2 "^build_from:" build.yaml | grep "amd64:" | awk '{print $2}' | tr -d '"')
+          elif [ "${{ matrix.architecture }}" = "aarch64" ]; then
+            BUILD_FROM=$(grep -A 2 "^build_from:" build.yaml | grep "aarch64:" | awk '{print $2}' | tr -d '"')
+          fi
+          echo "BUILD_FROM=$BUILD_FROM" >> $GITHUB_OUTPUT
+      - name: Build image for ${{ matrix.architecture }}
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.architecture == 'amd64' && 'linux/amd64' || 'linux/arm64' }}
+          build-args: |
+            BUILD_FROM=${{ steps.image.outputs.BUILD_FROM }}
+          push: false
+          tags: homedetector:test-${{ matrix.architecture }}
