@@ -57,6 +57,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+coverage.md
+tests/*/report.md
 
 # Translations
 *.mo
