@@ -1,6 +1,9 @@
 # Custom Project Ignores
 *.db*
 
+# For now, let's ignore VSCode settings
+.vscode/
+
 # Opencanry
 twistd.pid
 opencanary.log
