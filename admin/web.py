@@ -101,9 +101,9 @@ DB_T_ALERTS = "alerts"
 DB_SCHEMA_T_ALERTS = f'CREATE TABLE "{DB_T_ALERTS}" ("id" TEXT, "timestamp" TEXT, "type" TEXT, "src_ip" TEXT, "message" TEXT, "unread" INTEGER)'
 
 DB_V_DOMAINS = "v_domains"
-DB_SCHEMA_V_DOMAINS = f'CREATE VIEW "{DB_V_DOMAINS}" AS SELECT "{DB_T_DOMAINS}".id, "{DB_T_DOMAINS}".last_seen, "{DB_T_DOMAINS}".domain, "{DB_T_DOMAINS}".counter, "{DB_T_DOMAINS}".action, "{DB_T_NETWORKS}".ip as scope FROM "{DB_T_DOMAINS}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_DOMAINS}".scope = "{DB_T_NETWORKS}".id'
+DB_SCHEMA_V_DOMAINS = f'CREATE VIEW "{DB_V_DOMAINS}" AS SELECT "{DB_T_DOMAINS}".id, "{DB_T_DOMAINS}".last_seen, "{DB_T_DOMAINS}".domain, "{DB_T_DOMAINS}".counter, "{DB_T_DOMAINS}".action, "{DB_T_DOMAINS}".alert, "{DB_T_NETWORKS}".ip as scope FROM "{DB_T_DOMAINS}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_DOMAINS}".scope = "{DB_T_NETWORKS}".id'
 DB_V_QUERIES = "v_queries"
-DB_SCHEMA_V_QUERIES = f'CREATE VIEW "{DB_V_QUERIES}" AS SELECT "{DB_T_QUERIES}".id, "{DB_T_QUERIES}".last_seen, "{DB_T_QUERIES}".query, "{DB_T_DOMAINS}".domain, "{DB_T_QUERIES}".query_type, "{DB_T_QUERIES}".src, "{DB_T_NETWORKS}".ip as scope, "{DB_T_QUERIES}".counter, "{DB_T_QUERIES}".action FROM "{DB_T_QUERIES}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_QUERIES}".scope_id = "{DB_T_NETWORKS}".id LEFT JOIN "{DB_T_DOMAINS}" ON "{DB_T_QUERIES}".domain_id = "{DB_T_DOMAINS}".id'
+DB_SCHEMA_V_QUERIES = f'CREATE VIEW "{DB_V_QUERIES}" AS SELECT "{DB_T_QUERIES}".id, "{DB_T_QUERIES}".last_seen, "{DB_T_QUERIES}".query, "{DB_T_DOMAINS}".domain, "{DB_T_QUERIES}".query_type, "{DB_T_QUERIES}".src, "{DB_T_NETWORKS}".ip as scope, "{DB_T_QUERIES}".counter, "{DB_T_QUERIES}".action, "{DB_T_QUERIES}".alert FROM "{DB_T_QUERIES}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_QUERIES}".scope_id = "{DB_T_NETWORKS}".id LEFT JOIN "{DB_T_DOMAINS}" ON "{DB_T_QUERIES}".domain_id = "{DB_T_DOMAINS}".id'
 
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 DB_SCHEMA = [
@@ -326,10 +326,13 @@ class DataDNSDomainsPage(Resource):
             logger.error(traceback.format_exc())
             return (status)
 
-        if update_name not in ['action']:
+        if update_name not in ['action', 'alert']:
             return (status)
 
         if update_name == "action" and update_value not in ['pass', 'block']:
+            return (status)
+
+        if update_name == "alert" and update_value not in ['0', '1']:
             return (status)
 
         try:
@@ -348,7 +351,7 @@ class DataDNSDomainsPage(Resource):
             Render a JSON page, paramaters are used for search & sort
         """
         limit, offset = get_limit_offset(request)
-        sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action', 'scope'])
+        sort, order = get_sort_n_order(request, "last_seen", ['domain', 'counter', 'action', 'scope', 'alert'])
 
         sql_where = ""
         sql_params = (limit, offset)
@@ -362,7 +365,7 @@ class DataDNSDomainsPage(Resource):
                 sql_where = " WHERE ((last_seen||domain||scope) LIKE ?) "
                 sql_params = (search_string, search_string, limit, offset)
 
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DOMAINS}{sql_where}) SELECT id,last_seen,domain,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_DOMAINS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DOMAINS}{sql_where}) SELECT id,last_seen,domain,counter,action,scope,alert,(SELECT total FROM CTE) total FROM {DB_V_DOMAINS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         total = 0
         for row in data:
@@ -373,10 +376,11 @@ class DataDNSDomainsPage(Resource):
                     'domain': row[2],
                     'counter': row[3],
                     'action': row[4],
-                    'scope': row[5]
+                    'scope': row[5],
+                    'alert': row[6]
                 }
             )
-            total = row[6]
+            total = row[7]
         response = {
             "data":"dns-domains",
             "total": total,
@@ -410,10 +414,13 @@ class DataDNSQueriesPage(Resource):
             logger.error(traceback.format_exc())
             return (status)
 
-        if update_name not in ['action']:
+        if update_name not in ['action', 'alert']:
             return (status)
 
         if update_name == "action" and update_value not in ['pass', 'block']:
+            return (status)
+
+        if update_name == "alert" and update_value not in ['0', '1']:
             return (status)
 
         try:
@@ -429,7 +436,7 @@ class DataDNSQueriesPage(Resource):
 
     def render_GET(self, request):
         limit, offset = get_limit_offset(request)
-        sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action', 'scope', 'domain'])
+        sort, order = get_sort_n_order(request, "last_seen", ['domain_id', 'query', 'query_type', 'src', 'counter', 'action', 'scope', 'domain', 'alert'])
 
         sql_where = ""
         sql_params = (limit, offset)
@@ -443,7 +450,7 @@ class DataDNSQueriesPage(Resource):
                 sql_where = " WHERE ((last_seen||domain||query||src||scope) LIKE ?) "
                 sql_params = (search_string, search_string, limit, offset)
 
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_QUERIES}{sql_where}) SELECT id,last_seen,domain,query,query_type,src,counter,action,scope,(SELECT total FROM CTE) total FROM {DB_V_QUERIES}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_QUERIES}{sql_where}) SELECT id,last_seen,domain,query,query_type,src,counter,action,scope,alert,(SELECT total FROM CTE) total FROM {DB_V_QUERIES}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         total = 0
         for row in data:
@@ -458,9 +465,10 @@ class DataDNSQueriesPage(Resource):
                     'counter': row[6],
                     'action': row[7],
                     'scope': row[8],
+                    'alert': row[9]
                 }
             )
-            total = row[9]
+            total = row[10]
         response = {
             "data":"dns-queries",
             "total": total,

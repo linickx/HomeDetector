@@ -126,11 +126,11 @@ def setup_data_db(tmp_path, monkeypatch):
         (),
     )
     web.sql_action(
-        f'CREATE TABLE "{web.DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER, "scope" TEXT, "action" TEXT, "last_seen" TEXT)',
+        f'CREATE TABLE "{web.DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER, "scope" TEXT, "action" TEXT, "last_seen" TEXT, "alert" INTEGER DEFAULT 1)',
         (),
     )
     web.sql_action(
-        f'CREATE TABLE "{web.DB_T_QUERIES}" ("id" TEXT, "src" TEXT, "scope_id" TEXT, "query" TEXT, "query_type" TEXT, "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)',
+        f'CREATE TABLE "{web.DB_T_QUERIES}" ("id" TEXT, "src" TEXT, "scope_id" TEXT, "query" TEXT, "query_type" TEXT, "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT, "alert" INTEGER DEFAULT 1)',
         (),
     )
     web.sql_action(
@@ -328,6 +328,12 @@ def test_data_dns_domains_page_get_and_post(tmp_path, monkeypatch):
     data = json.loads(output.decode("utf-8"))
     assert data["total"] == 1
     assert data["rows"][0]["domain"] == "example.com"
+    assert data["rows"][0]["alert"] == 1
+
+    post_request = DummyRequest(args={b"name": [b"alert"], b"value": [b"0"], b"pk": [b"d1"]})
+    assert web.DataDNSDomainsPage().render_POST(post_request) == b"Ok"
+    rows = web.sql_action(f'SELECT "alert" FROM "{web.DB_T_DOMAINS}" WHERE id = ?', ("d1",))
+    assert rows[0][0] == 0
 
     post_request = DummyRequest(args={b"name": [b"action"], b"value": [b"block"], b"pk": [b"d1"]})
     assert web.DataDNSDomainsPage().render_POST(post_request) == b"Ok"

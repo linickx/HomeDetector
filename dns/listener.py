@@ -151,9 +151,9 @@ if len(custom_host_records) > 0:
 
 # Some Internal VARS
 DB_T_DOMAINS = "domains"
-DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT)'
+DB_SCHEMA_T_DOMAINS = f'CREATE TABLE "{DB_T_DOMAINS}" ("id" TEXT, "domain" TEXT, "counter" INTEGER,"scope" TEXT, "action" TEXT,"last_seen" TEXT, "alert" INTEGER DEFAULT 1)'
 DB_T_QUERIES = "queries"
-DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"scope_id" TEXT, "query" TEXT, "query_type", "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT)'
+DB_SCHEMA_T_QUERIES = f'CREATE TABLE "{DB_T_QUERIES}" ("id" TEXT, "src" TEXT,"scope_id" TEXT, "query" TEXT, "query_type" TEXT, "counter" INTEGER, "action" TEXT, "last_seen" TEXT, "domain_id" TEXT, "alert" INTEGER DEFAULT 1)'
 DB_T_NETWORKS = "networks"
 DB_SCHEMA_T_NETWORKS = f'CREATE TABLE "{DB_T_NETWORKS}" ("id" TEXT, "ip" TEXT,"type" TEXT, "action" TEXT,"created" TEXT, "name" TEXT)'
 DB_T_HOSTS = "hosts"
@@ -480,11 +480,12 @@ class DNSInterceptor(BaseResolver):
             * `query_id`: The Hash we're looking for...
             * `learning_mode` : True/False
             ### Return:
-            * `tuple` (id:str=None, counter:int, sql_action:str)
+            * `tuple` (id:str=None, counter:int, sql_action:str, domain_id:str, sql_alert:int)
         """
         sql_id = None
         sql_counter = 1
         domain_id = None
+        sql_alert = 1
 
         if learning_mode:
             sql_action = 'pass'
@@ -494,14 +495,14 @@ class DNSInterceptor(BaseResolver):
         with self.lock:
             sql_cursor = self.sql_connection.cursor()
             try:
-                sql_rows = sql_cursor.execute(f'SELECT "id", "counter", "action", "domain_id" FROM "{DB_T_QUERIES}" WHERE id = ?', (query_id,)).fetchall()
+                sql_rows = sql_cursor.execute(f'SELECT "id", "counter", "action", "domain_id", "alert" FROM "{DB_T_QUERIES}" WHERE id = ?', (query_id,)).fetchall()
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                 self.log.error(traceback.format_exc())
-                return sql_id, sql_counter, sql_action, domain_id
+                return sql_id, sql_counter, sql_action, domain_id, sql_alert
 
         if len(sql_rows) == 0:
-            return sql_id, sql_counter, sql_action, domain_id
+            return sql_id, sql_counter, sql_action, domain_id, sql_alert
 
         for row in sql_rows:
             if row[0] == query_id:
@@ -509,11 +510,12 @@ class DNSInterceptor(BaseResolver):
                 sql_counter = int(row[1])
                 sql_action = str(row[2]).strip()
                 domain_id = str(row[3]).strip()
+                sql_alert = int(row[4])
                 self.log.debug('ROW: %s', str(row))
 
         sql_cursor.close()
-        self.log.debug('ID: %s => %s (%s)', sql_id, sql_action, sql_counter )
-        return sql_id, sql_counter, sql_action, domain_id
+        self.log.debug('ID: %s => %s (%s) [Alert: %s]', sql_id, sql_action, sql_counter, sql_alert)
+        return sql_id, sql_counter, sql_action, domain_id, sql_alert
 
     def sqlDNSquery(self, x:dict):
         """
@@ -587,20 +589,20 @@ class DNSInterceptor(BaseResolver):
             * `scope_id` : ID Assocaited with source_ip
             * `learning_mode` : True/False
             ### Return:
-            * `tuple` (id:str=None, action:str='pass')
+            * `tuple` (id:str=None, action:str='pass', alert:int=1)
         """
         host_query_id = self.createID([source_ip, query_name, query_type])
         self.log.debug('[HOST] => SQLID: %s | Src IP: %s | Qname: %s | Qtype: %s', host_query_id, source_ip, query_name, query_type )
 
-        r_host_query_id, host_counter, host_action, host_domain_id = self.findSQLQueryID(host_query_id, learning_mode)
-        self.log.debug('[HOST] => SQL ID: %s | Counter: %s | Action: %s', r_host_query_id, host_counter, host_action)
+        r_host_query_id, host_counter, host_action, host_domain_id, host_alert = self.findSQLQueryID(host_query_id, learning_mode)
+        self.log.debug('[HOST] => SQL ID: %s | Counter: %s | Action: %s | Alert: %s', r_host_query_id, host_counter, host_action, host_alert)
 
         last_seen = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
 
         sql_id, sql_action = self.sqlDNSquery(
             {'result': r_host_query_id, 'id': host_query_id, 'counter': host_counter, 'action': host_action, 'scope_id':scope_id, 'src':source_ip, 'query':query_name, 'query_type':query_type, 'last_seen':last_seen, 'domain_id': host_domain_id}
         )
-        return sql_id, sql_action
+        return sql_id, sql_action, host_alert
 
     def findSQLDomainID(self, domain:str=None, scope_id:str=None, sql_action:str=None, learning_mode:bool=True):
         """
@@ -611,37 +613,39 @@ class DNSInterceptor(BaseResolver):
             * `sql_action` : 'block' or 'pass'
             * `learning_mode` : True/False
             ### Return:
-            * `tuple` (id:str=None, counter:int)
+            * `tuple` (id:str=None, counter:int, sql_action:str, sql_alert:int)
         """
         sql_id = None
         sql_counter = 1
+        sql_alert = 1
 
         with self.lock:
             sql_cursor = self.sql_connection.cursor()
             try:
-                sql_rows = sql_cursor.execute(f'SELECT "scope", "id", "counter", "action" FROM "{DB_T_DOMAINS}" WHERE domain = ? AND scope = ?', (domain,scope_id,)).fetchall()
+                sql_rows = sql_cursor.execute(f'SELECT "scope", "id", "counter", "action", "alert" FROM "{DB_T_DOMAINS}" WHERE domain = ? AND scope = ?', (domain,scope_id,)).fetchall()
             except Exception:
                 self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
                 self.log.error(traceback.format_exc())
-                return sql_id, sql_counter, sql_action
+                return sql_id, sql_counter, sql_action, sql_alert
 
         if len(sql_rows) == 0:
             if learning_mode:
                 sql_action = 'pass'
             else:
                 sql_action = 'block'
-            return sql_id, sql_counter, sql_action
+            return sql_id, sql_counter, sql_action, sql_alert
 
         for row in sql_rows:
             if row[0] == scope_id:
                 sql_id = str(row[1]).strip()
                 sql_counter = int(row[2])
                 sql_action = str(row[3]).strip()
+                sql_alert = int(row[4])
                 self.log.debug('ROW: %s', str(row))
 
         sql_cursor.close()
-        self.log.debug('🌍 For %s & Scope %s => ID: %s (%s/%s)', domain, scope_id, sql_id, sql_counter, sql_action)
-        return sql_id, sql_counter, sql_action
+        self.log.debug('🌍 For %s & Scope %s => ID: %s (%s/%s) [Alert: %s]', domain, scope_id, sql_id, sql_counter, sql_action, sql_alert)
+        return sql_id, sql_counter, sql_action, sql_alert
 
     def sqlDomains(self, domain:str=None, scope_id:str=None, action:str=None, learning_mode:bool=True):
         """
@@ -650,12 +654,12 @@ class DNSInterceptor(BaseResolver):
             * domain => Thing we are recording
             * source_ip => From where
             ### Return:
-            * tuple( sql_action:str, sql_id:str )
+            * tuple( sql_action:str, sql_id:str, sql_alert:int )
         """
         self.log.debug('Domain: %s | Scope: %s | Action: %s', domain, scope_id, action)
         last_seen = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
-        sql_id, sql_counter, sql_action = self.findSQLDomainID(scope_id=scope_id, domain=domain, sql_action=action, learning_mode=learning_mode)
-        self.log.debug('SQL ID: %s | Counter: %s | Action: %s', sql_id, sql_counter, action)
+        sql_id, sql_counter, sql_action, sql_alert = self.findSQLDomainID(scope_id=scope_id, domain=domain, sql_action=action, learning_mode=learning_mode)
+        self.log.debug('SQL ID: %s | Counter: %s | Action: %s | Alert: %s', sql_id, sql_counter, action, sql_alert)
         sql_cursor = self.sql_connection.cursor()
         if sql_id is None and (sql_action in ["pass" , "block"]):
             sql_id = self.createID([domain, scope_id])    # Create a new ID
@@ -701,7 +705,7 @@ class DNSInterceptor(BaseResolver):
             self.log.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
             self.log.error(traceback.format_exc())
 
-        return sql_action, sql_id
+        return sql_action, sql_id, sql_alert
 
     def linkSQLs(self, source_ip:str=None, scope_id:str=None, query_name:str=None, query_type:str=None, the_domain_id:str=None):
         """
@@ -759,12 +763,13 @@ class DNSInterceptor(BaseResolver):
             * scope_id => sope of source IP (used for SQL, create new records)
             * learning_mode: => scope status (used for SQL, above)
             ### Return:
-            * the domain:str ... or None for failed.
+            * the domain:str, action:str, id:str, alert:int
         """
 
         result = None
         result_id = None
         result_action = SOA_FAIL_ACTION
+        result_alert = 1
 
         q = DNSRecord(q=DNSQuestion(domain_query,getattr(QTYPE,'SOA')))
 
@@ -808,8 +813,8 @@ class DNSInterceptor(BaseResolver):
             self.log.error("General Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])
 
         if result is not None:
-            result_action, result_id = self.sqlDomains(domain=result,scope_id=scope_id,learning_mode=learning_mode)
-        return result, result_action, result_id
+            result_action, result_id, result_alert = self.sqlDomains(domain=result,scope_id=scope_id,learning_mode=learning_mode)
+        return result, result_action, result_id, result_alert
 
     def resolve(self,request,handler):
         """
@@ -841,10 +846,10 @@ class DNSInterceptor(BaseResolver):
             log_qu = "❓"   # Add icons for things in learning Mode... (Question)
             log_ans = "✅"  # (Answer)
 
-            the_query_id, the_query_action = self.findDNSQuery(str(qname), str(qtype), str(src_ip), scope_id, learning_mode)
-            self.log.debug('Query => %s [%s]', the_query_id, the_query_action)
+            the_query_id, the_query_action, the_query_alert = self.findDNSQuery(str(qname), str(qtype), str(src_ip), scope_id, learning_mode)
+            self.log.debug('Query => %s [%s] [Alert: %s]', the_query_id, the_query_action, the_query_alert)
 
-            the_domain, the_domain_action, the_domain_id = self.findDomain(qname, scope_id, learning_mode)
+            the_domain, the_domain_action, the_domain_id, the_domain_alert = self.findDomain(qname, scope_id, learning_mode)
             if the_domain is None:
                 self.log.error('😫 Failed to lookup domain for %s', qname)
             else:
@@ -854,8 +859,8 @@ class DNSInterceptor(BaseResolver):
             if not self.passThePacket(the_domain_action):
                 self.log.warning("🔥 New Authority DOMAIN %s Detected for Request %s 🔥", the_domain, qname)
                 if the_domain_id is None:
-                    the_domain_action, the_domain_id = self.sqlDomains(the_domain,scope_id,'block')
-                if WEBHOOKER:
+                    the_domain_action, the_domain_id, the_domain_alert = self.sqlDomains(the_domain,scope_id,'block')
+                if WEBHOOKER and the_domain_alert:
                     data = {
                         'type':'dns',
                         'alert_type': 'dns-domain',
@@ -875,7 +880,7 @@ class DNSInterceptor(BaseResolver):
 
             if DNS_DETECT_ON_HOST and not self.passThePacket(the_query_action):
                 self.log.warning("🔥 New QUERY %s Detected for %s (%s) 🔥", qname, src_ip, scope_id)
-                if WEBHOOKER:
+                if WEBHOOKER and the_query_alert:
                     data = {
                         'type':'dns',
                         'alert_type': 'dns-query',
@@ -958,6 +963,15 @@ def bootstrap(log:logging=logging):
         except sqlite3.OperationalError:
             if re.search(f"table \"{table[0]}\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
                 log.debug('DB Schema - Nothing to do')
+                # Migration: Add alert column if it doesn't exist
+                if table[0] in [DB_T_DOMAINS, DB_T_QUERIES]:
+                    cursor = connection.cursor()
+                    cursor.execute(f"PRAGMA table_info({table[0]})")
+                    columns = [column[1] for column in cursor.fetchall()]
+                    if 'alert' not in columns:
+                        log.info('Adding alert column to %s table', table[0])
+                        connection.execute(f'ALTER TABLE "{table[0]}" ADD COLUMN "alert" INTEGER DEFAULT 1')
+                    cursor.close()
                 status = True
             else:
                 log.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])

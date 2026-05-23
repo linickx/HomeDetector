@@ -215,11 +215,12 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
     for tuning detection rules.
     """
     query_id = interceptor.createID(["1.2.3.4", "example.com", "A"])
-    sql_id, counter, action, domain_id = interceptor.findSQLQueryID(query_id, learning_mode=True)
+    sql_id, counter, action, domain_id, alert = interceptor.findSQLQueryID(query_id, learning_mode=True)
     assert sql_id is None
     assert counter == 1
     assert action == "pass"
     assert domain_id is None
+    assert alert == 1
 
     sql_id, action = interceptor.sqlDNSquery(
         {
@@ -238,11 +239,12 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
     assert sql_id == query_id
     assert action == "pass"
 
-    sql_id, counter, action, domain_id = interceptor.findSQLQueryID(query_id, learning_mode=True)
+    sql_id, counter, action, domain_id, alert = interceptor.findSQLQueryID(query_id, learning_mode=True)
     assert sql_id == query_id
     assert counter == 1
     assert action == "pass"
     assert domain_id == "None"
+    assert alert == 1
 
     interceptor.sqlDNSquery(
         {
@@ -258,8 +260,9 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
             "domain_id": None,
         }
     )
-    sql_id, counter, action, domain_id = interceptor.findSQLQueryID(query_id, learning_mode=True)
+    sql_id, counter, action, domain_id, alert = interceptor.findSQLQueryID(query_id, learning_mode=True)
     assert counter == 2
+    assert alert == 1
 
 
 # ============================================================================
@@ -287,12 +290,14 @@ def test_sql_domains_insert_and_update(interceptor):
     - Rarely accessed domains (potentially suspicious)
     """
     scope_id = interceptor.createID(["host", "127.0.0.1"])
-    action, domain_id = interceptor.sqlDomains("example.com", scope_id, "pass", learning_mode=True)
+    action, domain_id, alert = interceptor.sqlDomains("example.com", scope_id, "pass", learning_mode=True)
     assert action == "pass"
     assert domain_id is not None
+    assert alert == 1
 
-    action, domain_id_again = interceptor.sqlDomains("example.com", scope_id, "pass", learning_mode=True)
+    action, domain_id_again, alert_again = interceptor.sqlDomains("example.com", scope_id, "pass", learning_mode=True)
     assert domain_id_again == domain_id
+    assert alert_again == 1
     sql_cursor = interceptor.sql_connection.cursor()
     rows = sql_cursor.execute(
         f'SELECT "counter" FROM "{listener.DB_T_DOMAINS}" WHERE id = ?', (domain_id,)
@@ -381,7 +386,8 @@ def test_find_domain_returns_none_on_no_response(interceptor, monkeypatch):
     """
     monkeypatch.setattr(interceptor, "sendSOArequest", lambda *_args, **_kwargs: None)
     scope_id = interceptor.local_networks[0]["id"]
-    domain, action, domain_id = interceptor.findDomain("example.com", scope_id, True)
+    domain, action, domain_id, alert = interceptor.findDomain("example.com", scope_id, True)
     assert domain is None
     assert action == listener.SOA_FAIL_ACTION
     assert domain_id is None
+    assert alert == 1
