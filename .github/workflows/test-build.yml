@@ -27,7 +27,7 @@ jobs:
         architecture: ${{ fromJson(needs.init.outputs.architectures) }}
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -43,7 +43,7 @@ jobs:
           fi
           echo "BUILD_FROM=$BUILD_FROM" >> $GITHUB_OUTPUT
       - name: Build image for ${{ matrix.architecture }}
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
