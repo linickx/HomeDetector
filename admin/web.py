@@ -968,7 +968,30 @@ def bootstrap():
             connection.execute(table[1])
         except sqlite3.OperationalError:
             if re.search(f"\"{table[0]}\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
-                logger.debug('DB Schema - Nothing to do')
+                # Migration: Add alert column if it doesn't exist
+                # This is critical here because the Web server starts before the DNS listener
+                # and needs this column to exist for the views to be created successfully.
+                if table[0] in [DB_T_DOMAINS, DB_T_QUERIES]:
+                    cursor = connection.cursor()
+                    cursor.execute(f"PRAGMA table_info({table[0]})")
+                    columns = [column[1] for column in cursor.fetchall()]
+                    if 'alert' not in columns:
+                        logger.info('Adding alert column to %s table', table[0])
+                        connection.execute(f'ALTER TABLE "{table[0]}" ADD COLUMN "alert" INTEGER DEFAULT 1')
+                    else:
+                        logger.debug('DB Schema %s- Nothing to do', table[0])
+                    cursor.close()
+                if table[0] in [DB_V_DOMAINS, DB_V_QUERIES]:
+                    cursor = connection.cursor()
+                    cursor.execute(f"PRAGMA table_info({table[0]})")
+                    columns = [column[1] for column in cursor.fetchall()]
+                    if 'alert' not in columns:
+                        logger.info('Adding alert column to view %s', table[0])
+                        connection.execute(f'DROP VIEW IF EXISTS "{table[0]}"')
+                        connection.execute(table[1])
+                    else:
+                        logger.debug('DB Schema %s- Nothing to do', table[0])
+                    cursor.close()
                 status = True
             else:
                 logger.error("Exception: %s - %s", sys.exc_info()[0], sys.exc_info()[1])

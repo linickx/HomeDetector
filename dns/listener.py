@@ -962,7 +962,6 @@ def bootstrap(log:logging=logging):
             connection.execute(table[1])
         except sqlite3.OperationalError:
             if re.search(f"table \"{table[0]}\" already exists", str(sys.exc_info()[1]), re.IGNORECASE):
-                log.debug('DB Schema - Nothing to do')
                 # Migration: Add alert column if it doesn't exist
                 if table[0] in [DB_T_DOMAINS, DB_T_QUERIES]:
                     cursor = connection.cursor()
@@ -971,6 +970,8 @@ def bootstrap(log:logging=logging):
                     if 'alert' not in columns:
                         log.info('Adding alert column to %s table', table[0])
                         connection.execute(f'ALTER TABLE "{table[0]}" ADD COLUMN "alert" INTEGER DEFAULT 1')
+                    else:
+                        log.debug('DB Schema %s - Nothing to do', table[0])
                     cursor.close()
                 status = True
             else:
