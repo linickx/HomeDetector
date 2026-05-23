@@ -1,0 +1,49 @@
+# Created by GitHub Copilot CLI on 2026-02-06
+name: Python Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Python tests with tox
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+      - name: Install tox
+        run: pip install tox
+      - name: Run tox tests
+        run: tox
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: |
+            tests/admin/report.md
+            tests/admin/coverage.md
+            tests/dns/report.md
+            tests/dns/coverage.md
+          retention-days: 30
+      - name: Display test results
+        if: always()
+        shell: bash
+        run: |
+          echo "## Admin Tests"
+          echo "### Report"
+          cat tests/admin/report.md
+          echo ""
+          echo "### Coverage"
+          cat tests/admin/coverage.md
+          echo ""
+          echo "## DNS Tests"
+          echo "### Report"
+          cat tests/dns/report.md
+          echo ""
+          echo "### Coverage"
+          cat tests/dns/coverage.md

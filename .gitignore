@@ -1,6 +1,9 @@
 # Custom Project Ignores
 *.db*
 
+# For now, let's ignore VSCode settings
+.vscode/
+
 # Opencanry
 twistd.pid
 opencanary.log
@@ -57,6 +60,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+coverage.md
+tests/*/report.md
 
 # Translations
 *.mo

@@ -1,6 +1,7 @@
 # Agent Instructions for HomeDetector
 <!-- Created by Copilot using model Claude Haiku 4.5 on 2026-02-01 -->
 <!-- Modified by Copilot using model GPT-5 mini on 2026-02-04 -->
+<!-- Modified by GitHub Copilot CLI on 2026-02-06 -->
 
 This document provides guidance for AI agents on how to understand, modify, and contribute to the HomeDetector project.
 
@@ -50,10 +51,21 @@ The system is composed of three main Python-based components that run concurrent
 
 ## Development Workflow
 
+### Virtual Environment
+<!-- Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05 -->
+This project uses `uv` to manage the Python virtual environment. All `python` and `pip` commands MUST be executed using the project's virtual environment located in the `.venv` directory. This ensures consistency and avoids conflicts with system-wide packages.
+
+For example, use `.venv/bin/python` and `.venv/bin/pip`.
+
 ### Setup
 
 1.  The application is designed to run in a Home Assistant environment or a Docker container.
-2.  Dependencies for each component are listed in `requirements.txt` files within their respective directories (`admin/`, `dns/`, `opencanary/`). To set up a local development environment, you would typically create a Python virtual environment and install these dependencies.
+2.  Dependencies for each component are listed in `requirements.txt` files within their respective directories (`admin/`, `dns/`, `opencanary/`). To set up a local development environment, you must create a Python virtual environment using `uv` and install these dependencies into it.
+
+    ```bash
+    uv venv
+    uv pip install -r admin/requirements.txt -r dns/requirements.txt -r opencanary/requirements.txt
+    ```
 3.  The central database is `hd.db`, located in the `/config/` directory in the container, or the project root during local development.
 
 ### Running the Application
@@ -76,6 +88,53 @@ The `run.sh` script is the main entry point. It launches the three key processes
     *   The main pages are `admin.j2` (Alerts), `dns.j2` (DNS logs), and `tuning.j2` (Network/Host configuration).
     *   JavaScript functionality relies heavily on jQuery and the `bootstrap-table` plugin, which fetches data from the JSON API endpoints defined in `admin/web.py` (e.g., `/admin/data/alerts`). To modify frontend behavior, you will likely need to interact with the `bootstrap-table` JavaScript API.
 
+### Testing
+<!-- Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05 -->
+The project uses `pytest` for unit and integration testing, and `tox` to automate the process. Tests are located in the `tests/` directory, with subdirectories for each component (`admin`, `dns`).
+
+*   **Admin Tests (`tests/admin/`)**: These tests cover the `admin/web.py` component. They use `pytest-twisted` to handle the asynchronous nature of the `twisted` web server.
+*   **DNS Tests (`tests/dns/`)**: These tests cover the `dns/listener.py` component.
+
+Each test directory contains its own `requirements.txt` to specify its Python dependencies.
+
+To run all tests and generate coverage reports, simply run `tox` from the project root:
+```bash
+tox
+```
+
+This will create separate virtual environments for each test suite, install the necessary dependencies, and run the tests. Coverage reports will be generated in the `htmlcov/` directory.
+
+You can also run a specific test environment:
+```bash
+tox -e test-admin
+tox -e test-dns
+```
+
+If you want to run the tests manually, you can still do so:
+```bash
+# Example for running admin tests
+cd tests/admin
+pip install -r requirements.txt
+pytest
+```
+
+### Building the Docker Image
+
+To build the Docker image locally using podman, use the build script located in the `tests/` directory:
+
+```bash
+tests/build.sh
+```
+
+This script automatically:
+1. Detects the system architecture (x86_64/amd64 or aarch64/arm64)
+2. Reads the appropriate base image from `build.yaml` based on your architecture
+3. Builds the Docker image with podman using the `homedetector:latest` tag and the correct `BUILD_FROM` argument
+
+The base images are defined in `build.yaml`:
+- **amd64**: `ghcr.io/home-assistant/amd64-base:3.22`
+- **aarch64**: `ghcr.io/home-assistant/aarch64-base:3.22`
+
 ### Database
 
 *   The database schema is defined and initialized in both `dns/listener.py` and `admin/web.py`.
@@ -97,7 +156,7 @@ Placement guidelines by file type:
 - Markdown: place the attribution HTML comment immediately below the main title heading (the top-level `#` line).
 - Python: module docstring and/or function docstring.
 - CSS/JavaScript: file header comment and/or function comment.
-- Shell/YAML: file header comment.
+- Shell/YAML (including GitHub Workflows): file header comment as the first line.
 
 Examples:
 - "Created by Copilot using model gpt-4o on 2026-01-28"
