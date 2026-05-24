@@ -1,3 +1,4 @@
+<!-- Modified by Gemini using model gemini-2.0-flash on 2026-05-24 -->
 {% extends 'base.j2' %}
 
 {% block content %}
@@ -7,6 +8,9 @@
   </li>
   <li class="nav-item" role="presentation">
     <button class="nav-link" id="host-tab" data-bs-toggle="tab" data-bs-target="#host-tab-pane" type="button" role="tab" aria-controls="host-tab-pane" aria-selected="false">Hosts</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="dnsignored-tab" data-bs-toggle="tab" data-bs-target="#dnsignored-tab-pane" type="button" role="tab" aria-controls="dnsignored-tab-pane" aria-selected="false">DNS Ignored</button>
   </li>
 </ul>
 <div class="tab-content" id="myTabContent">
@@ -55,6 +59,31 @@
             <th data-field="id" data-visible="false">ID</th>
             <th data-field="name" data-editable="true" data-sortable="true">Name</th>
             <th data-field="ip" data-sortable="true">IP Address</th>
+            </tr>
+        </thead>
+    </table>
+  </div>
+  <div class="tab-pane fade" id="dnsignored-tab-pane" role="tabpanel" aria-labelledby="dnsignored-tab" tabindex="0">
+  <p>&nbsp</p>
+    <table
+        id="table-tuning-dnsignored"
+        data-toggle="table"
+        data-pagination="true"
+        data-side-pagination="server"
+        data-search="true"
+        data-searchable="true"
+        data-url="{{ haurl }}admin/data/tuning/dnsignored"
+        data-editable-url="{{ haurl }}admin/data/tuning/dnsignored"
+        data-id-field="id"
+        data-sort-name="name"
+        data-sort-order="asc">
+        <thead>
+            <tr>
+            <th data-field="id" data-visible="false">ID</th>
+            <th data-field="type" data-sortable="true">Type</th>
+            <th data-field="name" data-sortable="true">Name</th>
+            <th data-field="counter" data-sortable="true">Hit Count</th>
+            <th data-field="alert" data-editable="true" data-sortable="true">Alert</th>
             </tr>
         </thead>
     </table>

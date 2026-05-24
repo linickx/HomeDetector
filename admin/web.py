@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # pylint: disable=W0718
+# Modified by Gemini using model gemini-2.0-flash on 2026-05-24
 import os
 import sys
 import logging
@@ -105,11 +106,15 @@ DB_SCHEMA_V_DOMAINS = f'CREATE VIEW "{DB_V_DOMAINS}" AS SELECT "{DB_T_DOMAINS}".
 DB_V_QUERIES = "v_queries"
 DB_SCHEMA_V_QUERIES = f'CREATE VIEW "{DB_V_QUERIES}" AS SELECT "{DB_T_QUERIES}".id, "{DB_T_QUERIES}".last_seen, "{DB_T_QUERIES}".query, "{DB_T_DOMAINS}".domain, "{DB_T_QUERIES}".query_type, "{DB_T_QUERIES}".src, "{DB_T_NETWORKS}".ip as scope, "{DB_T_QUERIES}".counter, "{DB_T_QUERIES}".action, "{DB_T_QUERIES}".alert FROM "{DB_T_QUERIES}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_QUERIES}".scope_id = "{DB_T_NETWORKS}".id LEFT JOIN "{DB_T_DOMAINS}" ON "{DB_T_QUERIES}".domain_id = "{DB_T_DOMAINS}".id'
 
+DB_V_DNS_IGNORED = "v_dns_ignored"
+DB_SCHEMA_V_DNS_IGNORED = f'CREATE VIEW "{DB_V_DNS_IGNORED}" AS SELECT \'domain\' AS type, counter, domain AS name, alert, id FROM "{DB_T_DOMAINS}" WHERE alert = 0 UNION ALL SELECT \'query\' AS type, counter, query AS name, alert, id FROM "{DB_T_QUERIES}" WHERE alert = 0'
+
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 DB_SCHEMA = [
     (DB_T_ALERTS, DB_SCHEMA_T_ALERTS),
     (DB_V_DOMAINS, DB_SCHEMA_V_DOMAINS),
-    (DB_V_QUERIES, DB_SCHEMA_V_QUERIES)
+    (DB_V_QUERIES, DB_SCHEMA_V_QUERIES),
+    (DB_V_DNS_IGNORED, DB_SCHEMA_V_DNS_IGNORED)
 ]
 
 # Stuff for the webserver.
@@ -647,6 +652,88 @@ class DataTuningNetworkPage(Resource):
         request.setHeader('Content-Type', 'application/json')
         return json.dumps(response).encode('utf-8')
 
+class DataTuningDNSIgnoredPage(Resource):
+    """
+        /admin/data/tuning/dnsignored <- JSON Data management for ignored DNS records
+    """
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataTuningDNSIgnoredPage()
+
+    def render_POST(self, request):
+        status = b"Update Failed"
+        logger.debug("DNS IGNORED POST String -> %s", request.args)
+
+        try:
+            update_name = request.args[b'name'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        try:
+            update_value = request.args[b'value'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if update_name not in ['alert']:
+            return (status)
+
+        if update_value not in ['0', '1']:
+            return (status)
+
+        try:
+            record_id = request.args[b'pk'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        # Attempt to update both tables, the ID is unique so only one will match (or none)
+        sql_action(f'UPDATE "{DB_T_DOMAINS}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, record_id))
+        sql_action(f'UPDATE "{DB_T_QUERIES}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, record_id))
+        
+        return b'Ok'
+
+    def render_GET(self, request):
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "name", ['type', 'counter', 'name', 'alert'])
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE (name LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+        
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DNS_IGNORED}{sql_where}) SELECT type,counter,name,alert,id,(SELECT total FROM CTE) total FROM {DB_V_DNS_IGNORED}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
+        rows = []
+        total = 0
+        if data:
+            for row in data:
+                rows.append(
+                    {
+                        'type': row[0],
+                        'counter': row[1],
+                        'name': row[2],
+                        'alert': row[3],
+                        'id': row[4]
+                    }
+                )
+                total = row[5]
+        response = {
+            "data":"tuning-dns-ignored",
+            "total": total,
+            "rows": rows
+        }
+        request.setHeader('Content-Type', 'application/json')
+        return json.dumps(response).encode('utf-8')
+
 class DataTuningRoot(Resource):
     """
         Route processor for /admin/data/tuning/
@@ -658,6 +745,8 @@ class DataTuningRoot(Resource):
             return DataTuningNetworkPage()
         if path_str == "hosts":
             return DataTuningHostPage()
+        if path_str == "dnsignored":
+            return DataTuningDNSIgnoredPage()
         return DataTuningRoot()
 
     def render_GET(self, request):
