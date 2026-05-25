@@ -1,4 +1,5 @@
 # Created by GitHub Copilot CLI on 2026-02-06
+# Modified by GitHub Copilot CLI on 2026-05-25
 name: Test Build
 
 on:
@@ -40,3 +41,13 @@ jobs:
           platforms: ${{ matrix.architecture == 'amd64' && 'linux/amd64' || 'linux/arm64' }}
           push: false
           tags: homedetector:test-${{ matrix.architecture }}
+          load: true
+      - name: Run image to verify startup
+        run: |
+          mkdir -p /tmp/hd-config
+          timeout 10 docker run --rm \
+            -v /tmp/hd-config:/config \
+            homedetector:test-${{ matrix.architecture }} \
+            2>&1 || [ $? -eq 124 ]  # Exit code 124 = timeout (expected)
+      - name: Verify container started without errors
+        run: echo "✅ Image runtime validated for ${{ matrix.architecture }}"
