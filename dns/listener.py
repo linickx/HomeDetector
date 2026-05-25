@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Modified by Gemini using model gemini-1.5-pro-002 on 2026-05-25
 # pylint: disable=W0718
 import sys
 import json
@@ -856,10 +857,13 @@ class DNSInterceptor(BaseResolver):
                 self.linkSQLs(str(src_ip), scope_id, str(qname), str(qtype), the_domain_id)
 
             self.log.info("✨ %s -> %s [Type: %s] => %s", src_ip, qname, qtype, the_domain)
-            if not self.passThePacket(the_domain_action):
-                self.log.warning("🔥 New Authority DOMAIN %s Detected for Request %s 🔥", the_domain, qname)
+            if not self.passThePacket(the_domain_action) or (not learning_mode and the_domain_alert):
+                if not self.passThePacket(the_domain_action):
+                    self.log.warning("🔥 New Authority DOMAIN %s Detected for Request %s 🔥", the_domain, qname)
+
                 if the_domain_id is None:
                     the_domain_action, the_domain_id, the_domain_alert = self.sqlDomains(the_domain,scope_id,'block')
+
                 if WEBHOOKER and the_domain_alert:
                     data = {
                         'type':'dns',
@@ -873,13 +877,16 @@ class DNSInterceptor(BaseResolver):
                     }
                     post_process_domain = Process(target=postwebhook, args=(data, self.log)) # Start a new process to avoid DNS latency
                     post_process_domain.start()
-                if DNS_FIREWALL_ON:
+
+                if DNS_FIREWALL_ON and not self.passThePacket(the_domain_action):
                     self.log.info("🔥🔥 DOMAIN BLOCKED %s 🔥🔥", the_domain)
                     reply.header.rcode = getattr(RCODE,'NXDOMAIN')
                     return reply
 
-            if DNS_DETECT_ON_HOST and not self.passThePacket(the_query_action):
-                self.log.warning("🔥 New QUERY %s Detected for %s (%s) 🔥", qname, src_ip, scope_id)
+            if DNS_DETECT_ON_HOST and (not self.passThePacket(the_query_action) or (not learning_mode and the_query_alert)):
+                if not self.passThePacket(the_query_action):
+                    self.log.warning("🔥 New QUERY %s Detected for %s (%s) 🔥", qname, src_ip, scope_id)
+
                 if WEBHOOKER and the_query_alert:
                     data = {
                         'type':'dns',
@@ -893,7 +900,8 @@ class DNSInterceptor(BaseResolver):
                     }
                     post_process_query = Process(target=postwebhook, args=(data, self.log))
                     post_process_query.start()
-                if DNS_FIREWALL_ON:
+
+                if DNS_FIREWALL_ON and not self.passThePacket(the_query_action):
                     self.log.info("🔥🔥 QUERY BLOCKED %s 🔥🔥", the_domain)
                     reply.header.rcode = getattr(RCODE,'NXDOMAIN')
                     return reply
