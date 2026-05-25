@@ -10,7 +10,10 @@
     <button class="nav-link" id="host-tab" data-bs-toggle="tab" data-bs-target="#host-tab-pane" type="button" role="tab" aria-controls="host-tab-pane" aria-selected="false">Hosts</button>
   </li>
   <li class="nav-item" role="presentation">
-    <button class="nav-link" id="dnsignored-tab" data-bs-toggle="tab" data-bs-target="#dnsignored-tab-pane" type="button" role="tab" aria-controls="dnsignored-tab-pane" aria-selected="false">DNS Ignored</button>
+    <button class="nav-link" id="dnsignored-tab" data-bs-toggle="tab" data-bs-target="#dnsignored-tab-pane" type="button" role="tab" aria-controls="dnsignored-tab-pane" aria-selected="false">Ignored DNS Blocks</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="dnspass-tab" data-bs-toggle="tab" data-bs-target="#dnspass-tab-pane" type="button" role="tab" aria-controls="dnspass-tab-pane" aria-selected="false">Alerting DNS Pass</button>
   </li>
 </ul>
 <div class="tab-content" id="myTabContent">
@@ -75,6 +78,31 @@
         data-searchable="true"
         data-url="{{ haurl }}admin/data/tuning/dnsignored"
         data-editable-url="{{ haurl }}admin/data/tuning/dnsignored"
+        data-id-field="id"
+        data-sort-name="name"
+        data-sort-order="asc">
+        <thead>
+            <tr>
+            <th data-field="id" data-visible="false">ID</th>
+            <th data-field="type" data-sortable="true">Type</th>
+            <th data-field="name" data-sortable="true">Name</th>
+            <th data-field="counter" data-sortable="true">Hit Count</th>
+            <th data-field="alert" data-formatter="alertFormatter" data-events="operateEvents" data-sortable="true">Alert</th>
+            </tr>
+        </thead>
+    </table>
+  </div>
+  <div class="tab-pane fade" id="dnspass-tab-pane" role="tabpanel" aria-labelledby="dnspass-tab" tabindex="0">
+  <p>&nbsp</p>
+    <table
+        id="table-tuning-dnspass"
+        data-toggle="table"
+        data-pagination="true"
+        data-side-pagination="server"
+        data-search="true"
+        data-searchable="true"
+        data-url="{{ haurl }}admin/data/tuning/dnspass"
+        data-editable-url="{{ haurl }}admin/data/tuning/dnspass"
         data-id-field="id"
         data-sort-name="name"
         data-sort-order="asc">

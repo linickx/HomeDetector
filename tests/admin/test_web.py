@@ -143,7 +143,8 @@ def setup_data_db(tmp_path, monkeypatch):
     )
     web.sql_action(web.DB_SCHEMA_V_DOMAINS, ())
     web.sql_action(web.DB_SCHEMA_V_QUERIES, ())
-    web.sql_action(web.DB_SCHEMA_V_DNS_IGNORED, ())
+    web.sql_action(web.DB_SCHEMA_V_DNS_IGNORED_BLOCKED, ())
+    web.sql_action(web.DB_SCHEMA_V_DNS_ALERTING_PASS, ())
 
 
 # ============================================================================
@@ -426,19 +427,19 @@ def test_data_tuning_dns_ignored_page_get_and_post(tmp_path, monkeypatch):
     """
     Test the DNS ignored tuning data API endpoint (GET and POST).
     
-    GET test: Verifies ignored domains and queries are listed
+    GET test: Verifies ignored DNS blocks are listed
     POST test: Verifies alert status can be toggled (e.g., 0 -> 1)
     """
     setup_data_db(tmp_path, monkeypatch)
-    # Add an ignored domain
+    # Add an ignored domain (must be action=block and alert=0)
     web.sql_action(
         f'INSERT INTO "{web.DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen", "alert") VALUES (?, ?, ?, ?, ?, ?, ?)',
-        ("d_ignored", "ignored.com", 5, "n1", "pass", "2026-02-09T00:00:00+00:00", 0),
+        ("d_ignored", "ignored.com", 5, "n1", "block", "2026-02-09T00:00:00+00:00", 0),
     )
-    # Add an ignored query
+    # Add an ignored query (must be action=block and alert=0)
     web.sql_action(
         f'INSERT INTO "{web.DB_T_QUERIES}" ("id", "src", "scope_id", "query", "query_type", "counter", "action", "last_seen", "domain_id", "alert") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        ("q_ignored", "1.2.3.4", "n1", "secret.com", "A", 10, "pass", "2026-02-09T00:00:00+00:00", "d1", 0),
+        ("q_ignored", "1.2.3.4", "n1", "secret.com", "A", 10, "block", "2026-02-09T00:00:00+00:00", "d1", 0),
     )
 
     # Test GET
@@ -463,6 +464,46 @@ def test_data_tuning_dns_ignored_page_get_and_post(tmp_path, monkeypatch):
     assert rows[0][0] == 1
 
 
+def test_data_tuning_dns_alerting_pass_page_get_and_post(tmp_path, monkeypatch):
+    """
+    Test the DNS alerting pass tuning data API endpoint (GET and POST).
+    
+    GET test: Verifies alerting DNS passes are listed
+    POST test: Verifies alert status can be toggled (e.g., 1 -> 0)
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    # Add an alerting pass domain (must be action=pass and alert=1)
+    web.sql_action(
+        f'INSERT INTO "{web.DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen", "alert") VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ("d_alert_pass", "alerting.com", 3, "n1", "pass", "2026-02-09T00:00:00+00:00", 1),
+    )
+    # Add an alerting pass query (must be action=pass and alert=1)
+    web.sql_action(
+        f'INSERT INTO "{web.DB_T_QUERIES}" ("id", "src", "scope_id", "query", "query_type", "counter", "action", "last_seen", "domain_id", "alert") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        ("q_alert_pass", "1.2.3.4", "n1", "notify.me", "A", 8, "pass", "2026-02-09T00:00:00+00:00", "d_alert_pass", 1),
+    )
+
+    # Test GET
+    output = web.DataTuningDNSAlertingPassPage().render_GET(DummyRequest(args={b"limit": [b"10"], b"offset": [b"0"]}))
+    data = json.loads(output.decode("utf-8"))
+    assert data["total"] == 2
+    names = [row["name"] for row in data["rows"]]
+    assert "alerting.com" in names
+    assert "notify.me" in names
+
+    # Test POST (disable alert for domain)
+    post_request = DummyRequest(args={b"name": [b"alert"], b"value": [b"0"], b"pk": [b"d_alert_pass"]})
+    assert web.DataTuningDNSAlertingPassPage().render_POST(post_request) == b"Ok"
+    rows = web.sql_action(f'SELECT "alert" FROM "{web.DB_T_DOMAINS}" WHERE id = ?', ("d_alert_pass",))
+    assert rows[0][0] == 0
+
+    # Test POST (disable alert for query)
+    post_request = DummyRequest(args={b"name": [b"alert"], b"value": [b"0"], b"pk": [b"q_alert_pass"]})
+    assert web.DataTuningDNSAlertingPassPage().render_POST(post_request) == b"Ok"
+    rows = web.sql_action(f'SELECT "alert" FROM "{web.DB_T_QUERIES}" WHERE id = ?', ("q_alert_pass",))
+    assert rows[0][0] == 0
+
+
 def test_data_roots():
     """
     Test that the data API root resources route to the correct child pages.
@@ -483,6 +524,7 @@ def test_data_roots():
     assert isinstance(tuning_root.getChild(b"networks", DummyRequest()), web.DataTuningNetworkPage)
     assert isinstance(tuning_root.getChild(b"hosts", DummyRequest()), web.DataTuningHostPage)
     assert isinstance(tuning_root.getChild(b"dnsignored", DummyRequest()), web.DataTuningDNSIgnoredPage)
+    assert isinstance(tuning_root.getChild(b"dnspass", DummyRequest()), web.DataTuningDNSAlertingPassPage)
     assert tuning_root.render_GET(DummyRequest()) == b'{"data":"tuning"}'
 
     data_root = web.DataRoot()
