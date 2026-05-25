@@ -5,40 +5,80 @@ on:
   release:
     types: [published]
 
+env:
+  ARCHITECTURES: '["amd64", "aarch64"]'
+  IMAGE_NAME: addon-homedetector
+
+permissions:
+  contents: read
+
 jobs:
   init:
     name: Initialize build
     runs-on: ubuntu-latest
     outputs:
-      architectures: ${{ steps.info.outputs.architectures }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v6
-      - name: Get information
-        id: info
-        uses: home-assistant/actions/helpers/info@master
+
+      - name: Get build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@master
+        with:
+          architectures: ${{ env.ARCHITECTURES }}
+          image-name: ${{ env.IMAGE_NAME }}
+          registry-prefix: docker.io/${{ vars.DOCKERHUB_USERNAME }}
 
   build:
-    name: Publish builder
+    name: Build ${{ matrix.arch }} image
     needs: init
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write # Write needed for Cosign signing (issue OIDC token for signing)
     strategy:
-      fail-fast: False
-      matrix:
-        architecture: ${{ fromJson(needs.init.outputs.architectures) }}
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.init.outputs.matrix) }}
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v6
-      - name: Login to DockerHub
-        uses: docker/login-action@v4
+      - uses: actions/checkout@v6
+
+      - name: Build image
+        uses: home-assistant/builder/actions/build-image@master
         with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Publish
-        uses: home-assistant/builder@master
+          arch: ${{ matrix.arch }}
+          container-registry: docker.io
+          container-registry-username: ${{ vars.DOCKERHUB_USERNAME }}
+          container-registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image: ${{ matrix.image }}
+          image-tags: |
+            ${{ github.event.release.tag_name }}
+            latest
+          push: "true"
+          version: ${{ github.event.release.tag_name }}
+
+      - name: Create SBOM
+        uses: anchore/sbom-action@v0
         with:
-          args: |
-            --${{ matrix.architecture }} \
-            --image  addon-homedetector-${{ matrix.architecture }} \
-            --target /data/ \
-            --docker-hub linickx
+          image: ${{ matrix.image }}:latest
+          format: spdx-json
+
+  manifest:
+    name: Publish multi-arch manifest
+    needs: [init, build]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Write needed for Cosign signing (issue OIDC token for signing)
+    steps:
+      - name: Publish multi-arch manifest
+        uses: home-assistant/builder/actions/publish-multi-arch-manifest@master
+        with:
+          architectures: ${{ env.ARCHITECTURES }}
+          container-registry: docker.io
+          registry-prefix: docker.io/${{ vars.DOCKERHUB_USERNAME }}
+          container-registry-username: ${{ vars.DOCKERHUB_USERNAME }}
+          container-registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image-name: ${{ env.IMAGE_NAME }}
+          image-tags: |
+            ${{ github.event.release.tag_name }}
+            latest

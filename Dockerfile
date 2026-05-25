@@ -1,5 +1,12 @@
-ARG BUILD_FROM
-FROM $BUILD_FROM
+# https://developers.home-assistant.io/docs/add-ons/configuration#add-on-dockerfile
+# https://github.com/home-assistant/docker-base
+FROM ghcr.io/home-assistant/base:latest
+
+LABEL \
+    org.opencontainers.image.title="HomeDetector" \
+    org.opencontainers.image.description="Intrusion Detection add-on for Home Assistant" \
+    org.opencontainers.image.source="https://github.com/linickx/HomeDetector" \
+    org.opencontainers.image.licenses="MIT License"
 
 # DNS Listener APKs
 RUN apk add --no-cache python3 py3-pip py3-virtualenv
