@@ -53,19 +53,44 @@ The system is composed of three main Python-based components that run concurrent
 
 ### Virtual Environment
 <!-- Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05 -->
-This project uses `uv` to manage the Python virtual environment. All `python` and `pip` commands MUST be executed using the project's virtual environment located in the `.venv` directory. This ensures consistency and avoids conflicts with system-wide packages.
+<!-- Modified by GitHub Copilot CLI on 2026-05-25 -->
+This project uses `uv` to manage the Python virtual environment and dependencies through `pyproject.toml`. All `python` and `pip` commands MUST be executed using the project's virtual environment located in the `.venv` directory. This ensures consistency and avoids conflicts with system-wide packages.
 
 For example, use `.venv/bin/python` and `.venv/bin/pip`.
 
 ### Setup
 
 1.  The application is designed to run in a Home Assistant environment or a Docker container.
-2.  Dependencies for each component are listed in `requirements.txt` files within their respective directories (`admin/`, `dns/`, `opencanary/`). To set up a local development environment, you must create a Python virtual environment using `uv` and install these dependencies into it.
+2.  Dependencies are centrally managed in `pyproject.toml` using optional dependency groups. To set up a local development environment:
 
     ```bash
-    uv venv
-    uv pip install -r admin/requirements.txt -r dns/requirements.txt -r opencanary/requirements.txt
+    # Create virtual environment and install all runtime components + test dependencies
+    uv sync --all-extras
     ```
+
+    **Optional: Install specific component dependencies only:**
+    ```bash
+    # DNS listener only
+    uv sync --extra dns --extra test
+    
+    # Admin web server only
+    uv sync --extra admin --extra test
+    
+    # Honeypot only
+    uv sync --extra honeypot --extra test
+    
+    # All runtime components (DNS, admin, honeypot)
+    uv sync --extra all --extra test
+    ```
+
+    **Available dependency groups:**
+    - `dns`: DNS listener (dnslib, netaddr, requests)
+    - `admin`: Web server (Twisted, Jinja2)
+    - `honeypot`: OpenCanary honeypot (opencanary)
+    - `all`: All runtime components (includes dns, admin, honeypot)
+    - `test`: Testing framework (pytest, pytest-twisted, pytest-cov, tox)
+    - `dev`: Development (includes test)
+
 3.  The central database is `hd.db`, located in the `/config/` directory in the container, or the project root during local development.
 
 ### Running the Application

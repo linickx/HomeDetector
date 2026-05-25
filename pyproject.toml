@@ -1,0 +1,80 @@
+# Created by GitHub Copilot CLI on 2026-05-25
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "homedetector"
+version = "0.1.0"
+description = "Lightweight network intrusion detection system and honeypot for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "linickx"}
+]
+keywords = ["home-assistant", "ids", "intrusion-detection", "honeypot", "dns", "security"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Home Automation",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Networking :: Monitoring",
+]
+
+# Core dependencies required by all components
+dependencies = []
+
+# Optional dependency groups for different use cases
+[project.optional-dependencies]
+dns = [
+    "dnslib==0.9.24",
+    "netaddr==1.2.1",
+    "requests==2.33.0",
+]
+admin = [
+    "Twisted==24.11.0",
+    "Jinja2==3.1.6",
+]
+honeypot = [
+    "opencanary==0.9.8",
+]
+# Install all runtime components
+all = [
+    "homedetector[dns]",
+    "homedetector[admin]",
+    "homedetector[honeypot]",
+]
+# Development and testing dependencies
+test = [
+    "pytest",
+    "pytest-twisted",
+    "pytest-cov",
+    "tox",
+]
+dev = [
+    "homedetector[test]",
+]
+
+[project.urls]
+Homepage = "https://github.com/linickx/HomeDetector"
+Repository = "https://github.com/linickx/HomeDetector"
+Issues = "https://github.com/linickx/HomeDetector/issues"
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--cov=. --cov-report=html --cov-report=term-missing"
+
+[tool.tox]
+legacy_tox_ini = "tox.ini"
