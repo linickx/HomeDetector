@@ -23,7 +23,8 @@
         data-editable-url="{{ haurl }}admin/data/dns/domains"
         data-id-field="id"
         data-sort-name="counter"
-        data-sort-order="desc">
+        data-sort-order="desc"
+        data-off-value="pass">
         <thead>
             <tr>
             <th data-field="id" data-visible="false">ID</th>
@@ -31,8 +32,8 @@
             <th data-field="scope" data-sortable="true">Scope</th>
             <th data-field="domain" data-sortable="true">Domain</th>
             <th data-field="counter" data-sortable="true">Hit Count</th>
-            <th data-field="action" data-editable="true" data-sortable="true">Action</th>
-            <th data-field="alert" data-editable="true" data-sortable="true">Alert</th>
+            <th data-field="action" data-formatter="actionFormatter" data-events="operateEvents" data-sortable="true">Block</th>
+            <th data-field="alert" data-formatter="alertFormatter" data-events="operateEvents" data-sortable="true">Alert</th>
             </tr>
         </thead>
     </table>
@@ -50,7 +51,8 @@
         data-editable-url="{{ haurl }}admin/data/dns/queries"
         data-id-field="id"
         data-sort-name="counter"
-        data-sort-order="desc">
+        data-sort-order="desc"
+        data-off-value="pass">
         <thead>
             <tr>
             <th data-field="id" data-visible="false">ID</th>
@@ -61,8 +63,8 @@
             <th data-field="src" data-sortable="true">Source IP</th>
             <th data-field="scope" data-sortable="true">Scope</th>
             <th data-field="counter" data-sortable="true">Hit Count</th>
-            <th data-field="action" data-editable="true" data-sortable="true">Action</th>
-            <th data-field="alert" data-editable="true" data-sortable="true">Alert</th>
+            <th data-field="action" data-formatter="actionFormatter" data-events="operateEvents" data-sortable="true">Block</th>
+            <th data-field="alert" data-formatter="alertFormatter" data-events="operateEvents" data-sortable="true">Alert</th>
             </tr>
         </thead>
     </table>
