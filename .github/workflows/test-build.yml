@@ -45,7 +45,7 @@ jobs:
       - name: Run image to verify startup
         run: |
           mkdir -p /tmp/hd-config
-          timeout 10 docker run --rm \
+          timeout 15 docker run --rm \
             -v /tmp/hd-config:/config \
             homedetector:test-${{ matrix.architecture }} \
             2>&1 || [ $? -eq 124 ]  # Exit code 124 = timeout (expected)
