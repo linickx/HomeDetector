@@ -1067,6 +1067,8 @@ def bootstrap():
                     if 'alert' not in columns:
                         logger.info('Adding alert column to %s table', table[0])
                         connection.execute(f'ALTER TABLE "{table[0]}" ADD COLUMN "alert" INTEGER DEFAULT 1')
+                        logger.info('Updating existing records to alert=0 where action=pass for %s', table[0])
+                        connection.execute(f'UPDATE "{table[0]}" SET "alert" = 0 WHERE "action" = \'pass\'')
                     else:
                         logger.debug('DB Schema %s- Nothing to do', table[0])
                     cursor.close()
