@@ -33,8 +33,8 @@ COPY admin/web.py /app/
 
 # Setup Python Env...
 RUN virtualenv /env
-ENV VIRTUAL_ENV /env
-ENV PATH /env/bin:$PATH
+ENV VIRTUAL_ENV="/env"
+ENV PATH="/env/bin:$PATH"
 RUN pip install --upgrade pip
 RUN pip install --requirement /tmp/dns.requirements.txt
 RUN pip install --requirement /tmp/oc.requirements.txt
