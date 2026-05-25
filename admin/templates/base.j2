@@ -58,6 +58,46 @@
 {% if active == "tuning" or active == "dns" %}
 <script src="{{ haurl }}static/js/bootstrap-table-editable.js"></script>
 <script src="{{ haurl }}static/js/bootstrap-editable.min.js"></script>
+<script>
+    /* Modified by Gemini using model gemini-2.0-flash on 2026-05-25 */
+    function alertFormatter(value, row, index) {
+        return `<div class="form-check form-switch">
+                    <input class="form-check-input alert-toggle" type="checkbox" role="switch" ${value == 1 ? 'checked' : ''}>
+                </div>`;
+    }
+
+    function actionFormatter(value, row, index, field) {
+        return `<div class="form-check form-switch">
+                    <input class="form-check-input action-toggle" type="checkbox" role="switch" ${value === 'block' ? 'checked' : ''}>
+                </div>`;
+    }
+
+    window.operateEvents = {
+        'change .alert-toggle': function (e, value, row, index) {
+            const $el = $(e.target);
+            const newValue = $el.prop('checked') ? "1" : "0";
+            const url = $el.closest('table').attr('data-editable-url');
+            $.post(url, { pk: row.id, name: 'alert', value: newValue })
+                .fail(function() {
+                    $el.prop('checked', !$el.prop('checked'));
+                    alert('Update failed');
+                });
+        },
+        'change .action-toggle': function (e, value, row, index) {
+            const $el = $(e.target);
+            const isChecked = $el.prop('checked');
+            const $table = $el.closest('table');
+            const offValue = $table.attr('data-off-value') || 'pass';
+            const newValue = isChecked ? 'block' : offValue;
+            const url = $table.attr('data-editable-url');
+            $.post(url, { pk: row.id, name: 'action', value: newValue })
+                .fail(function() {
+                    $el.prop('checked', !isChecked);
+                    alert('Update failed');
+                });
+        }
+    };
+</script>
 {% endif %}
 </body>
 </html>

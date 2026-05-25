@@ -106,15 +106,19 @@ DB_SCHEMA_V_DOMAINS = f'CREATE VIEW "{DB_V_DOMAINS}" AS SELECT "{DB_T_DOMAINS}".
 DB_V_QUERIES = "v_queries"
 DB_SCHEMA_V_QUERIES = f'CREATE VIEW "{DB_V_QUERIES}" AS SELECT "{DB_T_QUERIES}".id, "{DB_T_QUERIES}".last_seen, "{DB_T_QUERIES}".query, "{DB_T_DOMAINS}".domain, "{DB_T_QUERIES}".query_type, "{DB_T_QUERIES}".src, "{DB_T_NETWORKS}".ip as scope, "{DB_T_QUERIES}".counter, "{DB_T_QUERIES}".action, "{DB_T_QUERIES}".alert FROM "{DB_T_QUERIES}"  LEFT JOIN "{DB_T_NETWORKS}" ON "{DB_T_QUERIES}".scope_id = "{DB_T_NETWORKS}".id LEFT JOIN "{DB_T_DOMAINS}" ON "{DB_T_QUERIES}".domain_id = "{DB_T_DOMAINS}".id'
 
-DB_V_DNS_IGNORED = "v_dns_ignored"
-DB_SCHEMA_V_DNS_IGNORED = f'CREATE VIEW "{DB_V_DNS_IGNORED}" AS SELECT \'domain\' AS type, counter, domain AS name, alert, id FROM "{DB_T_DOMAINS}" WHERE alert = 0 UNION ALL SELECT \'query\' AS type, counter, query AS name, alert, id FROM "{DB_T_QUERIES}" WHERE alert = 0'
+DB_V_DNS_IGNORED_BLOCKED = "v_dns_ignored_blocked"
+DB_SCHEMA_V_DNS_IGNORED_BLOCKED = f'CREATE VIEW "{DB_V_DNS_IGNORED_BLOCKED}" AS SELECT \'domain\' AS type, counter, domain AS name, alert, id FROM "{DB_T_DOMAINS}" WHERE action = \'block\' AND alert = 0 UNION ALL SELECT \'query\' AS type, counter, query AS name, alert, id FROM "{DB_T_QUERIES}" WHERE action = \'block\' AND alert = 0'
+
+DB_V_DNS_ALERTING_PASS = "v_dns_alerting_pass"
+DB_SCHEMA_V_DNS_ALERTING_PASS = f'CREATE VIEW "{DB_V_DNS_ALERTING_PASS}" AS SELECT \'domain\' AS type, counter, domain AS name, alert, id FROM "{DB_T_DOMAINS}" WHERE action = \'pass\' AND alert = 1 UNION ALL SELECT \'query\' AS type, counter, query AS name, alert, id FROM "{DB_T_QUERIES}" WHERE action = \'pass\' AND alert = 1'
 
 DB_ID_SALT = 'This is not for security, it is for uniqueness'
 DB_SCHEMA = [
     (DB_T_ALERTS, DB_SCHEMA_T_ALERTS),
     (DB_V_DOMAINS, DB_SCHEMA_V_DOMAINS),
     (DB_V_QUERIES, DB_SCHEMA_V_QUERIES),
-    (DB_V_DNS_IGNORED, DB_SCHEMA_V_DNS_IGNORED)
+    (DB_V_DNS_IGNORED_BLOCKED, DB_SCHEMA_V_DNS_IGNORED_BLOCKED),
+    (DB_V_DNS_ALERTING_PASS, DB_SCHEMA_V_DNS_ALERTING_PASS)
 ]
 
 # Stuff for the webserver.
@@ -654,14 +658,14 @@ class DataTuningNetworkPage(Resource):
 
 class DataTuningDNSIgnoredPage(Resource):
     """
-        /admin/data/tuning/dnsignored <- JSON Data management for ignored DNS records
+        /admin/data/tuning/dnsignored <- JSON Data management for ignored DNS blocks
     """
     def getChild(self, path, request): # pylint: disable=W0613
         return DataTuningDNSIgnoredPage()
 
     def render_POST(self, request):
         status = b"Update Failed"
-        logger.debug("DNS IGNORED POST String -> %s", request.args)
+        logger.debug("DNS IGNORED BLOCKED POST String -> %s", request.args)
 
         try:
             update_name = request.args[b'name'][0].decode('utf-8')
@@ -693,7 +697,7 @@ class DataTuningDNSIgnoredPage(Resource):
         # Attempt to update both tables, the ID is unique so only one will match (or none)
         sql_action(f'UPDATE "{DB_T_DOMAINS}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, record_id))
         sql_action(f'UPDATE "{DB_T_QUERIES}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, record_id))
-        
+
         return b'Ok'
 
     def render_GET(self, request):
@@ -710,8 +714,8 @@ class DataTuningDNSIgnoredPage(Resource):
                 search_string = f"%{search_string}%"
                 sql_where = " WHERE (name LIKE ?) "
                 sql_params = (search_string, search_string, limit, offset)
-        
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DNS_IGNORED}{sql_where}) SELECT type,counter,name,alert,id,(SELECT total FROM CTE) total FROM {DB_V_DNS_IGNORED}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
+
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DNS_IGNORED_BLOCKED}{sql_where}) SELECT type,counter,name,alert,id,(SELECT total FROM CTE) total FROM {DB_V_DNS_IGNORED_BLOCKED}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         total = 0
         if data:
@@ -734,6 +738,88 @@ class DataTuningDNSIgnoredPage(Resource):
         request.setHeader('Content-Type', 'application/json')
         return json.dumps(response).encode('utf-8')
 
+class DataTuningDNSAlertingPassPage(Resource):
+    """
+        /admin/data/tuning/dnspass <- JSON Data management for alerting DNS passes
+    """
+    def getChild(self, path, request): # pylint: disable=W0613
+        return DataTuningDNSAlertingPassPage()
+
+    def render_POST(self, request):
+        status = b"Update Failed"
+        logger.debug("DNS ALERTING PASS POST String -> %s", request.args)
+
+        try:
+            update_name = request.args[b'name'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        try:
+            update_value = request.args[b'value'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        if update_name not in ['alert']:
+            return (status)
+
+        if update_value not in ['0', '1']:
+            return (status)
+
+        try:
+            record_id = request.args[b'pk'][0].decode('utf-8')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            logger.error(traceback.format_exc())
+            return (status)
+
+        # Attempt to update both tables, the ID is unique so only one will match (or none)
+        sql_action(f'UPDATE "{DB_T_DOMAINS}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, record_id))
+        sql_action(f'UPDATE "{DB_T_QUERIES}" SET "{update_name}" = ? WHERE "id" = ?', (update_value, record_id))
+
+        return b'Ok'
+
+    def render_GET(self, request):
+        limit, offset = get_limit_offset(request)
+        sort, order = get_sort_n_order(request, "name", ['type', 'counter', 'name', 'alert'])
+        sql_where = ""
+        sql_params = (limit, offset)
+        try:
+            search_string = request.args[b'search'][0].decode('utf-8')
+        except Exception:
+            pass
+        else:
+            if search_string != "":
+                search_string = f"%{search_string}%"
+                sql_where = " WHERE (name LIKE ?) "
+                sql_params = (search_string, search_string, limit, offset)
+
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_V_DNS_ALERTING_PASS}{sql_where}) SELECT type,counter,name,alert,id,(SELECT total FROM CTE) total FROM {DB_V_DNS_ALERTING_PASS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
+        rows = []
+        total = 0
+        if data:
+            for row in data:
+                rows.append(
+                    {
+                        'type': row[0],
+                        'counter': row[1],
+                        'name': row[2],
+                        'alert': row[3],
+                        'id': row[4]
+                    }
+                )
+                total = row[5]
+        response = {
+            "data":"tuning-dns-alerting-pass",
+            "total": total,
+            "rows": rows
+        }
+        request.setHeader('Content-Type', 'application/json')
+        return json.dumps(response).encode('utf-8')
+
 class DataTuningRoot(Resource):
     """
         Route processor for /admin/data/tuning/
@@ -747,6 +833,8 @@ class DataTuningRoot(Resource):
             return DataTuningHostPage()
         if path_str == "dnsignored":
             return DataTuningDNSIgnoredPage()
+        if path_str == "dnspass":
+            return DataTuningDNSAlertingPassPage()
         return DataTuningRoot()
 
     def render_GET(self, request):
@@ -1067,6 +1155,8 @@ def bootstrap():
                     if 'alert' not in columns:
                         logger.info('Adding alert column to %s table', table[0])
                         connection.execute(f'ALTER TABLE "{table[0]}" ADD COLUMN "alert" INTEGER DEFAULT 1')
+                        logger.info('Updating existing records to alert=0 where action=pass for %s', table[0])
+                        connection.execute(f'UPDATE "{table[0]}" SET "alert" = 0 WHERE "action" = \'pass\'')
                     else:
                         logger.debug('DB Schema %s- Nothing to do', table[0])
                     cursor.close()
