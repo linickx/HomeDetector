@@ -49,5 +49,3 @@ jobs:
             -v /tmp/hd-config:/config \
             homedetector:test-${{ matrix.architecture }} \
             2>&1 || [ $? -eq 124 ]  # Exit code 124 = timeout (expected)
-      - name: Verify container started without errors
-        run: echo "✅ Image runtime validated for ${{ matrix.architecture }}"
