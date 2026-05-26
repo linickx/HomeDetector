@@ -3,6 +3,7 @@
 # Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05
 # Modified by Codex using model gpt-5 on 2026-02-09
 # Modified by GitHub Copilot using model Claude Sonnet 4.5 on 2026-02-11
+# Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
 """
 Unit tests for the admin/web.py module.
 
@@ -705,3 +706,211 @@ def test_post_to_ha_notify(monkeypatch):
     assert web.post_to_ha_notify({"type": "opencanary", "message": "hello"}) is True
     assert "Home Detector Alert | opencanary" in calls["json"]["title"]
     assert calls["json"]["message"] == "hello"
+
+
+# ============================================================================
+# New Tests for Coverage Improvement
+# ============================================================================
+
+
+def test_dns_page_render_get():
+    """
+    Test that DNS page renders successfully.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    page = web.DNSPage()
+    output = page.render_GET(DummyRequest(url="http://example.com/admin/dns"))
+    assert b"DNS" in output
+
+
+def test_tuning_page_render_get():
+    """
+    Test that Tuning page renders successfully.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    page = web.TuningPage()
+    output = page.render_GET(DummyRequest(url="http://example.com/admin/tuning"))
+    assert b"Tuning" in output
+
+
+def test_admin_root_firewall_block():
+    """
+    Test that AdminRoot blocks requests from non-whitelisted remote IPs.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    root = web.AdminRoot()
+    blocked_req = DummyRequest(peer_host="8.8.8.8")
+    child = root.getChild(b"dns", blocked_req)
+    assert isinstance(child, web.WebRootPage)
+    
+    res = root.render_GET(blocked_req)
+    assert b"There is no spoon" in res
+
+
+def test_data_alerts_page_post_actions(tmp_path, monkeypatch):
+    """
+    Test delete and toggle_read actions on DataAlertsPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    
+    web.sql_action(
+        f'INSERT INTO "{web.DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message", "unread") VALUES (?, ?, ?, ?, ?, ?)',
+        ("alert1", "2026-02-09T00:00:00+00:00", "dns-domain", "1.2.3.4", "Alert A", 1),
+    )
+    web.sql_action(
+        f'INSERT INTO "{web.DB_T_ALERTS}" ("id", "timestamp", "type", "src_ip", "message", "unread") VALUES (?, ?, ?, ?, ?, ?)',
+        ("alert2", "2026-02-09T01:00:00+00:00", "dns-query", "5.6.7.8", "Alert B", 1),
+    )
+    
+    page = web.DataAlertsPage()
+    
+    req_toggle = DummyRequest(args={b"action": [b"toggle_read"], b"ids": [b"alert1,alert2"]})
+    res_toggle = page.render_POST(req_toggle)
+    assert res_toggle == b"Ok"
+    
+    rows = web.sql_action(f'SELECT id, unread FROM "{web.DB_T_ALERTS}" ORDER BY id', ())
+    assert rows[0][1] == 0
+    assert rows[1][1] == 0
+
+    req_delete = DummyRequest(args={b"action": [b"delete"], b"ids": [b"alert1"]})
+    res_delete = page.render_POST(req_delete)
+    assert res_delete == b"Ok"
+    
+    rows_remaining = web.sql_action(f'SELECT id FROM "{web.DB_T_ALERTS}"', ())
+    assert len(rows_remaining) == 1
+    assert rows_remaining[0][0] == "alert2"
+
+    req_invalid = DummyRequest(args={b"action": [b"invalid_action"], b"ids": [b"alert2"]})
+    assert page.render_POST(req_invalid) == b"Update Failed"
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_get_child_routing():
+    """
+    Test getChild routing for resources.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    assert isinstance(web.DNSPage().getChild(b"anything", DummyRequest()), web.DNSPage)
+    assert isinstance(web.TuningPage().getChild(b"anything", DummyRequest()), web.TuningPage)
+    assert isinstance(web.DataAlertsPage().getChild(b"anything", DummyRequest()), web.DataAlertsPage)
+
+
+def test_get_limit_offset_invalid():
+    """
+    Test get_limit_offset handles invalid limit/offset gracefully.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    req = DummyRequest(args={b"limit": [b"not-an-int"], b"offset": [b"abc"]})
+    assert web.get_limit_offset(req) == (10, 0)
+
+
+def test_get_sort_n_order_invalid():
+    """
+    Test get_sort_n_order fallback for invalid columns.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    req = DummyRequest(args={b"sort": [b"non_existent"], b"order": [b"invalid_order"]})
+    sort, order = web.get_sort_n_order(req, "timestamp", ["timestamp"])
+    assert sort == "timestamp"
+    assert order == "DESC"
+
+
+def test_data_dns_domains_page_post_security_validation(tmp_path, monkeypatch):
+    """
+    Test security validation of POST fields in DataDNSDomainsPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    page = web.DataDNSDomainsPage()
+    
+    req_invalid_name = DummyRequest(args={b"name": [b"domain"], b"value": [b"newdomain.com"], b"pk": [b"d1"]})
+    assert page.render_POST(req_invalid_name) == b"Update Failed"
+
+    req_invalid_action = DummyRequest(args={b"name": [b"action"], b"value": [b"delete_all"], b"pk": [b"d1"]})
+    assert page.render_POST(req_invalid_action) == b"Update Failed"
+
+    req_invalid_alert = DummyRequest(args={b"name": [b"alert"], b"value": [b"99"], b"pk": [b"d1"]})
+    assert page.render_POST(req_invalid_alert) == b"Update Failed"
+    
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_data_dns_queries_page_post_security_validation(tmp_path, monkeypatch):
+    """
+    Test security validation of POST fields in DataDNSQueriesPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    page = web.DataDNSQueriesPage()
+    
+    req_invalid_name = DummyRequest(args={b"name": [b"src"], b"value": [b"9.9.9.9"], b"pk": [b"q1"]})
+    assert page.render_POST(req_invalid_name) == b"Update Failed"
+    
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_data_tuning_networks_page_post_security_validation(tmp_path, monkeypatch):
+    """
+    Test security validation of POST fields in DataTuningNetworkPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    page = web.DataTuningNetworkPage()
+    
+    req_invalid_name = DummyRequest(args={b"name": [b"ip"], b"value": [b"10.0.0.0/24"], b"pk": [b"n1"]})
+    assert page.render_POST(req_invalid_name) == b"Update Failed"
+
+    req_invalid_action = DummyRequest(args={b"name": [b"action"], b"value": [b"invalid_mode"], b"pk": [b"n1"]})
+    assert page.render_POST(req_invalid_action) == b"Update Failed"
+    
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_data_tuning_hosts_page_post_security_validation(tmp_path, monkeypatch):
+    """
+    Test security validation of POST fields in DataTuningHostPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    page = web.DataTuningHostPage()
+    
+    req_invalid_name = DummyRequest(args={b"name": [b"ip"], b"value": [b"10.0.0.9"], b"pk": [b"h1"]})
+    assert page.render_POST(req_invalid_name) == b"Update Failed"
+    
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_data_tuning_dns_ignored_post_security_validation(tmp_path, monkeypatch):
+    """
+    Test security validation of POST fields in DataTuningDNSIgnoredPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    page = web.DataTuningDNSIgnoredPage()
+    req_invalid = DummyRequest(args={b"name": [b"counter"], b"value": [b"10"], b"pk": [b"d1"]})
+    assert page.render_POST(req_invalid) == b"Update Failed"
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_data_tuning_dns_alerting_pass_post_security_validation(tmp_path, monkeypatch):
+    """
+    Test security validation of POST fields in DataTuningDNSAlertingPassPage.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    page = web.DataTuningDNSAlertingPassPage()
+    req_invalid = DummyRequest(args={b"name": [b"counter"], b"value": [b"10"], b"pk": [b"d1"]})
+    assert page.render_POST(req_invalid) == b"Update Failed"
+    assert page.render_POST(DummyRequest()) == b"Update Failed"
+
+
+def test_webhook_unknown_type(tmp_path, monkeypatch):
+    """
+    Test that webhook handles unknown payload types gracefully.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    setup_data_db(tmp_path, monkeypatch)
+    data = {"type": "unknown_component", "data": "hello"}
+    output = web.Webhook().render_POST(DummyRequest(content=json.dumps(data).encode("utf-8")))
+    assert output == b"echo reply \n"
