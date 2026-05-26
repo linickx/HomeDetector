@@ -2,6 +2,7 @@
 <!-- Created by Copilot using model Claude Haiku 4.5 on 2026-02-01 -->
 <!-- Modified by Copilot using model GPT-5 mini on 2026-02-04 -->
 <!-- Modified by GitHub Copilot CLI on 2026-02-06 -->
+<!-- Modified by Gemini using model gemini-3.5-flash on 2026-05-26 -->
 
 This document provides guidance for AI agents on how to understand, modify, and contribute to the HomeDetector project.
 
@@ -27,6 +28,7 @@ The system is composed of three main Python-based components that run concurrent
 
 2.  **Admin Web Server (`admin/web.py`)**:
     *   A web application built using the `twisted` library for the server and `jinja2` for HTML templating.
+    *   It listens on port 8099 (which is the Home Assistant Ingress port).
     *   It serves the main administrative UI for viewing alerts and configuring detection rules.
     *   It exposes a `/notify` webhook endpoint that receives alerts from the DNS Listener and OpenCanary.
     *   It stores received alerts in the same SQLite database (`hd.db`).
@@ -54,9 +56,10 @@ The system is composed of three main Python-based components that run concurrent
 ### Virtual Environment
 <!-- Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05 -->
 <!-- Modified by GitHub Copilot CLI on 2026-05-25 -->
+<!-- Modified by Gemini using model gemini-3.5-flash on 2026-05-26 -->
 This project uses `uv` to manage the Python virtual environment and dependencies through `pyproject.toml`. All `python` and `pip` commands MUST be executed using the project's virtual environment located in the `.venv` directory. This ensures consistency and avoids conflicts with system-wide packages.
 
-For example, use `.venv/bin/python` and `.venv/bin/pip`.
+For example, use `.venv/bin/python` and `.venv/bin/pip`, or prefix commands with `uv run` (e.g., `uv run python dns/listener.py`), which automatically executes them in the virtual environment context.
 
 ### Setup
 
@@ -122,28 +125,30 @@ The project uses `pytest` for unit and integration testing, and `tox` to automat
 
 Each test directory contains its own `requirements.txt` to specify its Python dependencies.
 
-To run all tests and generate coverage reports, simply run `tox` from the project root:
+To run all tests and generate coverage reports, simply run `tox` (or `uv run tox`) from the project root:
 ```bash
-tox
+uv run tox
 ```
 
 This will create separate virtual environments for each test suite, install the necessary dependencies, and run the tests. Coverage reports will be generated in the `htmlcov/` directory.
 
 You can also run a specific test environment:
 ```bash
-tox -e test-admin
-tox -e test-dns
+uv run tox -e test-admin
+uv run tox -e test-dns
 ```
 
-If you want to run the tests manually, you can still do so:
+If you want to run the tests manually, you can run them via `uv run`:
 ```bash
-# Example for running admin tests
-cd tests/admin
-pip install -r requirements.txt
-pytest
+# Run admin tests
+uv run pytest tests/admin/
+
+# Run DNS tests
+uv run pytest tests/dns/
 ```
 
 ### Building the Docker Image
+<!-- Modified by Gemini using model gemini-3.5-flash on 2026-05-26 -->
 
 To build the Docker image locally using podman, use the build script located in the `tests/` directory:
 
@@ -152,13 +157,10 @@ tests/build.sh
 ```
 
 This script automatically:
-1. Detects the system architecture (x86_64/amd64 or aarch64/arm64)
-2. Reads the appropriate base image from `build.yaml` based on your architecture
-3. Builds the Docker image with podman using the `homedetector:latest` tag and the correct `BUILD_FROM` argument
+1. Detects the system architecture (`x86_64/amd64` or `aarch64/arm64`).
+2. Builds the Docker image with podman using the `homedetector-<arch>:latest` tag.
 
-The base images are defined in `build.yaml`:
-- **amd64**: `ghcr.io/home-assistant/amd64-base:3.22`
-- **aarch64**: `ghcr.io/home-assistant/aarch64-base:3.22`
+Note: The project uses the modern Home Assistant builder workflow. The `Dockerfile` pulls directly from the unified `ghcr.io/home-assistant/base:latest` image, and the obsolete `build.yaml` file has been removed.
 
 ### Database
 
