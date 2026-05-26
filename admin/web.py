@@ -263,13 +263,39 @@ class DataAlertsPage(Resource):
     def getChild(self, path, request): # pylint: disable=W0613
         return DataAlertsPage()
 
+    def render_POST(self, request):
+        """
+            Process bulk actions (delete, toggle_read)
+        """
+        status = b"Update Failed"
+        logger.debug("ALERTS POST String -> %s", request.args)
+
+        try:
+            action = request.args[b'action'][0].decode('utf-8')
+            ids = request.args[b'ids'][0].decode('utf-8').split(',')
+        except Exception:
+            logger.error("Exception: %s - %s", str(sys.exc_info()[0]), str(sys.exc_info()[1]))
+            return status
+
+        if action == "delete":
+            for alert_id in ids:
+                sql_action(f'DELETE FROM "{DB_T_ALERTS}" WHERE "id" = ?', (alert_id,))
+            return b'Ok'
+
+        if action == "toggle_read":
+            for alert_id in ids:
+                sql_action(f'UPDATE "{DB_T_ALERTS}" SET "unread" = 1 - "unread" WHERE "id" = ?', (alert_id,))
+            return b'Ok'
+
+        return status
+
     def render_GET(self, request):
         """
             Render a JSON page, paramaters are used for search & sort
         """
         # Sanitise our Inputs...
         limit, offset = get_limit_offset(request)
-        sort, order = get_sort_n_order(request, "timestamp", ['id', 'timestamp', 'type', 'src_ip', 'message'])
+        sort, order = get_sort_n_order(request, "timestamp", ['id', 'timestamp', 'type', 'src_ip', 'message', 'unread'])
 
         sql_where = ""
         sql_params = (limit, offset)
@@ -284,7 +310,7 @@ class DataAlertsPage(Resource):
                 sql_params = (search_string, search_string, limit, offset)
 
         # SQL ~Injection~ away!
-        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}{sql_where}) SELECT id,timestamp,type,src_ip,message,(SELECT total FROM CTE) total FROM {DB_T_ALERTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
+        data = sql_action(f"WITH CTE as (SELECT count(*) total FROM {DB_T_ALERTS}{sql_where}) SELECT id,timestamp,type,src_ip,message,unread,(SELECT total FROM CTE) total FROM {DB_T_ALERTS}{sql_where} ORDER BY {sort} {order} LIMIT ? OFFSET ?", sql_params)
         rows = []
         total = 0
         for row in data:
@@ -295,9 +321,10 @@ class DataAlertsPage(Resource):
                     'type': row[2],
                     'src_ip': row[3],
                     'message': row[4],
+                    'unread': row[5],
                 }
             )
-            total = row[5]
+            total = row[6]
         response = {
             "data":"alerts",
             "total": total,
