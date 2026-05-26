@@ -3,6 +3,7 @@
 # Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05
 # Modified by Codex using model gpt-5 on 2026-02-09
 # Modified by GitHub Copilot using model Claude Sonnet 4.5 on 2026-02-11
+# Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
 """
 Unit tests for the dns/listener.py module.
 
@@ -391,3 +392,267 @@ def test_find_domain_returns_none_on_no_response(interceptor, monkeypatch):
     assert action == listener.SOA_FAIL_ACTION
     assert domain_id is None
     assert alert == 1
+
+
+# ============================================================================
+# New Tests for Coverage Improvement
+# ============================================================================
+
+
+def test_resolve_fake_a_records(interceptor, monkeypatch):
+    """
+    Test DNS resolve with fake A records mapping.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    from dnslib import DNSRecord
+    monkeypatch.setitem(listener.FAKE_A_RECORDS, "testfake.com", "10.0.0.99")
+    req = DNSRecord.question("testfake.com")
+    class DummyHandler:
+        client_address = ("127.0.0.1", 12345)
+        protocol = "udp"
+    
+    reply = interceptor.resolve(req, DummyHandler())
+    assert reply is not None
+    answers = [str(r.rdata) for r in reply.rr]
+    assert "10.0.0.99" in answers
+
+
+def test_resolve_unknown_ip_block(interceptor, monkeypatch):
+    """
+    Test DNS resolve unknown IP blocking.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    from dnslib import DNSRecord, RCODE
+    monkeypatch.setattr(listener, "UKNOWN_IP_PASS", False)
+    req = DNSRecord.question("example.com")
+    class DummyHandler:
+        client_address = ("8.8.8.8", 12345)
+        protocol = "udp"
+    
+    reply = interceptor.resolve(req, DummyHandler())
+    assert reply.header.rcode == getattr(RCODE, "NXDOMAIN")
+
+
+def test_resolve_unknown_ip_pass(interceptor, monkeypatch):
+    """
+    Test DNS resolve unknown IP passing through.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    from dnslib import DNSRecord
+    monkeypatch.setattr(listener, "UKNOWN_IP_PASS", True)
+    req = DNSRecord.question("example.com")
+    class DummyHandler:
+        client_address = ("8.8.8.8", 12345)
+        protocol = "udp"
+    
+    monkeypatch.setattr(req, "send", lambda *args, **kwargs: req.pack())
+    
+    reply = interceptor.resolve(req, DummyHandler())
+    assert reply is not None
+
+
+def test_resolve_monitored_network_learning(interceptor, monkeypatch):
+    """
+    Test DNS resolve with monitored network in learning mode.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    from dnslib import DNSRecord, DNSQuestion, RR, SOA, QTYPE
+    
+    def fake_send_soa(soa_query, index=0, tcp=False):
+        reply = soa_query.reply()
+        reply.add_auth(RR("example.com", QTYPE.SOA, rdata=SOA("ns.example.com", "admin.example.com", (2026052601, 3600, 600, 86400, 3600))))
+        return reply.pack()
+    
+    monkeypatch.setattr(interceptor, "sendSOArequest", fake_send_soa)
+    
+    req = DNSRecord.question("sub.example.com")
+    class DummyHandler:
+        client_address = ("127.0.0.1", 12345)
+        protocol = "udp"
+    
+    monkeypatch.setattr(req, "send", lambda *args, **kwargs: req.pack())
+    
+    reply = interceptor.resolve(req, DummyHandler())
+    assert reply is not None
+    
+    cursor = interceptor.sql_connection.cursor()
+    rows = cursor.execute('SELECT domain, action FROM domains').fetchall()
+    cursor.close()
+    assert len(rows) > 0
+    assert any(r[0] == "example.com." and r[1] == "pass" for r in rows)
+
+
+def test_resolve_monitored_network_blocking(interceptor, monkeypatch):
+    """
+    Test DNS resolve with monitored network in blocking mode.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    from dnslib import DNSRecord, DNSQuestion, RR, SOA, QTYPE, RCODE
+    
+    monkeypatch.setattr(listener, "DNS_FIREWALL_ON", True)
+    
+    for net in interceptor.local_networks:
+        net["action"] = "block"
+        
+    def fake_send_soa(soa_query, index=0, tcp=False):
+        reply = soa_query.reply()
+        reply.add_auth(RR("blockeddomain.com", QTYPE.SOA, rdata=SOA("ns.blockeddomain.com", "admin.blockeddomain.com", (2026052601, 3600, 600, 86400, 3600))))
+        return reply.pack()
+    
+    monkeypatch.setattr(interceptor, "sendSOArequest", fake_send_soa)
+    
+    req = DNSRecord.question("test.blockeddomain.com")
+    class DummyHandler:
+        client_address = ("127.0.0.1", 12345)
+        protocol = "udp"
+        
+    reply = interceptor.resolve(req, DummyHandler())
+    assert reply is not None
+    assert reply.header.rcode == getattr(RCODE, "NXDOMAIN")
+
+
+def test_postwebhook_success(monkeypatch):
+    """
+    Test postwebhook success path.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    class MockResponse:
+        status_code = 200
+        content = b"ok"
+    monkeypatch.setattr(listener.requests, "post", lambda *args, **kwargs: MockResponse())
+    assert listener.postwebhook({"data": "test"}) is True
+
+
+def test_postwebhook_non_200(monkeypatch):
+    """
+    Test postwebhook failure with non-200.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    class MockResponse:
+        status_code = 500
+        content = b"error"
+    monkeypatch.setattr(listener.requests, "post", lambda *args, **kwargs: MockResponse())
+    assert listener.postwebhook({"data": "test"}) is False
+
+
+def test_postwebhook_exception(monkeypatch):
+    """
+    Test postwebhook failure with exception.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    def fake_post(*args, **kwargs):
+        raise Exception("Connection error")
+    monkeypatch.setattr(listener.requests, "post", fake_post)
+    assert listener.postwebhook({"data": "test"}) is False
+
+
+def test_bootstrap_migrations(tmp_path, monkeypatch):
+    """
+    Test bootstrap DB schema migrations.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    import sqlite3
+    db_file = tmp_path / "test_migration.db"
+    monkeypatch.setattr(listener, "CONFIG_DB_PATH", str(tmp_path))
+    monkeypatch.setattr(listener, "CONFIG_DB_NAME", "test_migration.db")
+    
+    conn = sqlite3.connect(str(db_file))
+    conn.execute('CREATE TABLE "domains" ("id" TEXT, "domain" TEXT, "counter" INTEGER, "scope" TEXT, "action" TEXT, "last_seen" TEXT)')
+    conn.execute('INSERT INTO "domains" (id, domain, action) VALUES ("d1", "test.com", "pass")')
+    conn.commit()
+    conn.close()
+    
+    assert listener.bootstrap(listener.logger) is True
+    
+    conn = sqlite3.connect(str(db_file))
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(domains)")
+    columns = [col[1] for col in cursor.fetchall()]
+    assert "alert" in columns
+    
+    rows = cursor.execute("SELECT id, alert FROM domains").fetchall()
+    cursor.close()
+    conn.close()
+    assert rows[0][1] == 0
+
+
+def test_load_networks_invalid_ip(db_path, monkeypatch):
+    """
+    Test loading networks with invalid IP addresses.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    interceptor = listener.DNSInterceptor(
+        upstream=["8.8.8.8"],
+        dnsi_logger=listener.logger,
+        local_ips=[
+            {"address": "not-an-ip", "type": "host"},
+            {"address": "127.0.0.1", "type": "host"}
+        ]
+    )
+    assert len(interceptor.local_networks) == 1
+    interceptor.sql_connection.close()
+
+
+def test_load_networks_missing_type(db_path):
+    """
+    Test loading networks missing scope type parameter.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    interceptor = listener.DNSInterceptor(
+        upstream=["8.8.8.8"],
+        dnsi_logger=listener.logger,
+        local_ips=[{"address": "127.0.0.2"}]
+    )
+    assert len(interceptor.local_networks) == 1
+    assert "127.0.0.2" in interceptor.getscope("host", "127.0.0.2")
+    interceptor.sql_connection.close()
+
+
+def test_learning_mode_ttl_expired(interceptor, monkeypatch):
+    """
+    Test learningModeReValidation when TTL has expired.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    scope_id = interceptor.createID(["host", "127.0.0.1"])
+    created = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=2)
+    ttl = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=listener.LOCAL_NETWORKS_TTL + 10)
+    
+    with interceptor.lock:
+        cursor = interceptor.sql_connection.cursor()
+        cursor.execute(
+            f'UPDATE "{listener.DB_T_NETWORKS}" SET "action" = ? WHERE "id" = ?',
+            ("block", scope_id)
+        )
+        interceptor.sql_connection.commit()
+        cursor.close()
+        
+    action, new_ttl = interceptor.learningModeReValidation(scope_id, "learn", created, ttl=ttl)
+    assert action == "block"
+    assert new_ttl is not None
+
+
+def test_get_resolvers_default(monkeypatch):
+    """
+    Test getResolvers fallback behavior when UPSTREAM_RESOLVERS is empty.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    monkeypatch.setattr(listener, "UPSTREAM_RESOLVERS", [])
+    monkeypatch.setattr(listener, "readResolveConf", lambda r, log: [])
+    resolvers = listener.getResolvers(listener.logger)
+    assert resolvers == ["8.8.8.8", "1.1.1.1"]
+
+
+def test_get_resolvers_env_missing(monkeypatch):
+    """
+    Test getResolvers fallback when host fails env resolution.
+    Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+    """
+    monkeypatch.setattr(
+        listener,
+        "UPSTREAM_RESOLVERS",
+        [
+            {"server": "missing-host", "port": "53"},
+        ],
+    )
+    resolvers = listener.getResolvers(listener.logger)
+    assert resolvers == ["8.8.8.8", "1.1.1.1"]
