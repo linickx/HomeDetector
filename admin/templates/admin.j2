@@ -1,6 +1,20 @@
 {% extends 'base.j2' %}
 
 {% block content %}
+<style>
+  /* Force table cells to inherit the grey color when the row is marked as read */
+  tr.text-secondary td {
+    color: inherit !important;
+  }
+</style>
+<div id="toolbar">
+  <button id="btn-delete" class="btn btn-sm btn-outline-danger" disabled>
+    Delete
+  </button>
+  <button id="btn-read" class="btn btn-sm btn-outline-secondary" disabled>
+    Mark Read/Unread
+  </button>
+</div>
 <table
   id="table-alerts"
   data-toggle="table"
@@ -11,15 +25,70 @@
   data-url="{{ haurl }}admin/data/alerts"
   data-id-field="id"
   data-sort-name="timestamp"
-  data-sort-order="desc">
+  data-sort-order="desc"
+  data-toolbar="#toolbar"
+  data-row-style="rowStyle"
+  data-click-to-select="true">
   <thead>
     <tr>
+      <th data-checkbox="true"></th>
       <th data-field="id" data-visible="false">ID</th>
       <th data-field="timestamp" data-sortable="true">Timestamp</th>
       <th data-field="type" data-sortable="true">Type</th>
       <th data-field="src_ip" data-sortable="true">Source IP</th>
       <th data-field="message" data-sortable="true">Message</th>
+      <th data-field="unread" data-visible="false">Unread</th>
     </tr>
   </thead>
 </table>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* Modified by Gemini using model gemini-2.0-flash on 2026-05-26 */
+  var $table = $('#table-alerts')
+  var $btnDelete = $('#btn-delete')
+  var $btnRead = $('#btn-read')
+
+  function rowStyle(row, index) {
+    if (row.unread == 0) {
+      return {
+        classes: 'text-secondary'
+      }
+    }
+    return {}
+  }
+
+  $(function() {
+    $table.on('check.bs.table uncheck.bs.table check-all.bs.table uncheck-all.bs.table', function () {
+      var selections = $table.bootstrapTable('getSelections')
+      $btnDelete.prop('disabled', !selections.length)
+      $btnRead.prop('disabled', !selections.length)
+    })
+
+    $btnDelete.click(function () {
+      var ids = $.map($table.bootstrapTable('getSelections'), function (row) {
+        return row.id
+      })
+      if (confirm('Are you sure you want to delete ' + ids.length + ' alert(s)?')) {
+        $.post('{{ haurl }}admin/data/alerts', { action: 'delete', ids: ids.join(',') }, function () {
+          $table.bootstrapTable('refresh')
+          $btnDelete.prop('disabled', true)
+          $btnRead.prop('disabled', true)
+        })
+      }
+    })
+
+    $btnRead.click(function () {
+      var ids = $.map($table.bootstrapTable('getSelections'), function (row) {
+        return row.id
+      })
+      $.post('{{ haurl }}admin/data/alerts', { action: 'toggle_read', ids: ids.join(',') }, function () {
+        $table.bootstrapTable('refresh')
+        $btnDelete.prop('disabled', true)
+        $btnRead.prop('disabled', true)
+      })
+    })
+  })
+</script>
 {% endblock %}
