@@ -486,12 +486,13 @@ class DNSInterceptor(BaseResolver):
         sql_id = None
         sql_counter = 1
         domain_id = None
-        sql_alert = 1
-
+        
         if learning_mode:
             sql_action = 'pass'
+            sql_alert = 0
         else:
             sql_action = 'block'
+            sql_alert = 1
 
         with self.lock:
             sql_cursor = self.sql_connection.cursor()
@@ -540,13 +541,14 @@ class DNSInterceptor(BaseResolver):
                         x['counter'],
                         x['action'],
                         x['last_seen'],
-                        x['domain_id']
+                        x['domain_id'],
+                        x['alert']
                     )
             self.log.debug(str(params))
             with self.lock:
                 try:
                     sql_cursor.execute(
-                        f'INSERT INTO "{DB_T_QUERIES}" ("id", "src", "scope_id", "query", "query_type", "counter", "action", "last_seen", "domain_id") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        f'INSERT INTO "{DB_T_QUERIES}" ("id", "src", "scope_id", "query", "query_type", "counter", "action", "last_seen", "domain_id", "alert") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                         params
                     )
                 except Exception:
@@ -601,7 +603,7 @@ class DNSInterceptor(BaseResolver):
         last_seen = datetime.datetime.now(datetime.UTC).isoformat(timespec='seconds')
 
         sql_id, sql_action = self.sqlDNSquery(
-            {'result': r_host_query_id, 'id': host_query_id, 'counter': host_counter, 'action': host_action, 'scope_id':scope_id, 'src':source_ip, 'query':query_name, 'query_type':query_type, 'last_seen':last_seen, 'domain_id': host_domain_id}
+            {'result': r_host_query_id, 'id': host_query_id, 'counter': host_counter, 'action': host_action, 'scope_id':scope_id, 'src':source_ip, 'query':query_name, 'query_type':query_type, 'last_seen':last_seen, 'domain_id': host_domain_id, 'alert': host_alert}
         )
         return sql_id, sql_action, host_alert
 
@@ -618,7 +620,13 @@ class DNSInterceptor(BaseResolver):
         """
         sql_id = None
         sql_counter = 1
-        sql_alert = 1
+        
+        if learning_mode:
+            sql_action = 'pass'
+            sql_alert = 0
+        else:
+            sql_action = 'block'
+            sql_alert = 1
 
         with self.lock:
             sql_cursor = self.sql_connection.cursor()
@@ -630,10 +638,6 @@ class DNSInterceptor(BaseResolver):
                 return sql_id, sql_counter, sql_action, sql_alert
 
         if len(sql_rows) == 0:
-            if learning_mode:
-                sql_action = 'pass'
-            else:
-                sql_action = 'block'
             return sql_id, sql_counter, sql_action, sql_alert
 
         for row in sql_rows:
@@ -671,12 +675,13 @@ class DNSInterceptor(BaseResolver):
                         scope_id,
                         sql_action,
                         last_seen,
+                        sql_alert
                     )
             self.log.debug(str(params))
             with self.lock:
                 try:
                     sql_cursor.execute(                       # Create a new Row
-                        f'INSERT INTO "{DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen") VALUES (?, ?, ?, ?, ?, ?)',
+                        f'INSERT INTO "{DB_T_DOMAINS}" ("id", "domain", "counter", "scope", "action", "last_seen", "alert") VALUES (?, ?, ?, ?, ?, ?, ?)',
                         params
                     )
                 except Exception:
@@ -770,7 +775,11 @@ class DNSInterceptor(BaseResolver):
         result = None
         result_id = None
         result_action = SOA_FAIL_ACTION
-        result_alert = 1
+        
+        if learning_mode:
+            result_alert = 0
+        else:
+            result_alert = 1
 
         q = DNSRecord(q=DNSQuestion(domain_query,getattr(QTYPE,'SOA')))
 
