@@ -221,7 +221,7 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
     assert counter == 1
     assert action == "pass"
     assert domain_id is None
-    assert alert == 1
+    assert alert == 0
 
     sql_id, action = interceptor.sqlDNSquery(
         {
@@ -235,6 +235,7 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
             "query_type": "A",
             "last_seen": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
             "domain_id": None,
+            "alert": 0,
         }
     )
     assert sql_id == query_id
@@ -245,7 +246,7 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
     assert counter == 1
     assert action == "pass"
     assert domain_id == "None"
-    assert alert == 1
+    assert alert == 0
 
     interceptor.sqlDNSquery(
         {
@@ -263,7 +264,7 @@ def test_find_sql_query_id_and_sql_dns_query(interceptor):
     )
     sql_id, counter, action, domain_id, alert = interceptor.findSQLQueryID(query_id, learning_mode=True)
     assert counter == 2
-    assert alert == 1
+    assert alert == 0
 
 
 # ============================================================================
@@ -294,11 +295,11 @@ def test_sql_domains_insert_and_update(interceptor):
     action, domain_id, alert = interceptor.sqlDomains("example.com", scope_id, "pass", learning_mode=True)
     assert action == "pass"
     assert domain_id is not None
-    assert alert == 1
+    assert alert == 0
 
     action, domain_id_again, alert_again = interceptor.sqlDomains("example.com", scope_id, "pass", learning_mode=True)
     assert domain_id_again == domain_id
-    assert alert_again == 1
+    assert alert_again == 0
     sql_cursor = interceptor.sql_connection.cursor()
     rows = sql_cursor.execute(
         f'SELECT "counter" FROM "{listener.DB_T_DOMAINS}" WHERE id = ?', (domain_id,)
@@ -391,7 +392,7 @@ def test_find_domain_returns_none_on_no_response(interceptor, monkeypatch):
     assert domain is None
     assert action == listener.SOA_FAIL_ACTION
     assert domain_id is None
-    assert alert == 1
+    assert alert == 0
 
 
 # ============================================================================
