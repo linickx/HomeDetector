@@ -1,0 +1,55 @@
+#include <tunables/global>
+
+profile homedetector flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  file,
+  signal (send) set=(kill,term,int,hup,cont),
+
+  # Deny dangerous capabilities
+  deny capability dac_override,
+  deny capability dac_read_search,
+  deny capability setfcap,
+  deny capability setpcap,
+  deny capability sys_admin,
+  deny capability sys_chroot,
+  deny capability sys_ptrace,
+
+  # S6-Overlay
+  /init ix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /run/{,**} rwk,
+  /dev/tty rw,
+  /tmp/** rwk,
+
+  # Bashio integration for Home Assistant config
+  /usr/lib/bashio/** ix,
+
+  # Home Assistant add-on configuration and data
+  /data/** rw,
+  /data/options.json r,
+  /config/ r,
+  /config/hd.db rwk,
+  /config/opencanary.conf rw,
+
+  # Network access for DNS, HTTP, and honeypot services
+  network inet dgram,
+  network inet stream,
+  network unix dgram,
+  network unix stream,
+
+  # Python virtual envrionment
+  /env/** rm,
+  /env/bin/** rix,
+
+  # App location
+  /app/** r,
+}
