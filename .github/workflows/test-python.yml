@@ -1,8 +1,10 @@
+# Modified by Antigravity using model gemini-3.5-flash on 2026-05-31
 # Created by GitHub Copilot CLI on 2026-02-06
 name: Python Tests
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   test:

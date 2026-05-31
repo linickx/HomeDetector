@@ -1,3 +1,4 @@
+# Modified by Antigravity using model gemini-3.5-flash on 2026-05-31
 name: Docker-Image
 
 on:
@@ -13,8 +14,17 @@ permissions:
   contents: read
 
 jobs:
+  test-build:
+    name: Run Test Build
+    uses: ./.github/workflows/test-build.yml
+
+  test-python:
+    name: Run Python Tests
+    uses: ./.github/workflows/test-python.yml
+
   init:
     name: Initialize build
+    needs: [test-build, test-python]
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -52,10 +62,10 @@ jobs:
           container-registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
           image: ${{ matrix.image }}
           image-tags: |
-            ${{ github.event.release.tag_name }}
+            ${{ github.event.release.tag_name || 'test' }}
             latest
-          push: "true"
-          version: ${{ github.event.release.tag_name }}
+          push: ${{ github.event_name == 'release' && github.event.release.draft == false }}
+          version: ${{ github.event.release.tag_name || 'test' }}
 
       - name: Create SBOM
         uses: anchore/sbom-action@v0
@@ -66,6 +76,7 @@ jobs:
   manifest:
     name: Publish multi-arch manifest
     needs: [init, build]
+    if: github.event_name == 'release' && github.event.release.draft == false
     runs-on: ubuntu-latest
     permissions:
       id-token: write # Write needed for Cosign signing (issue OIDC token for signing)
