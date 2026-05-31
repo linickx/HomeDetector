@@ -45,7 +45,7 @@ jobs:
     needs: init
     runs-on: ${{ matrix.os }}
     permissions:
-      contents: read
+      contents: write
       id-token: write # Write needed for Cosign signing (issue OIDC token for signing)
     strategy:
       fail-fast: false
