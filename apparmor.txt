@@ -1,21 +1,22 @@
-# Created by Copilot using model Claude Haiku 4.5 on 2026-05-25
 #include <tunables/global>
 
 profile homedetector flags=(attach_disconnected,mediate_deleted) {
   #include <abstractions/base>
 
-  # Capabilities - Network access and DNS operations
-  capability net_bind_service,
-  capability net_raw,
-  capability sys_chroot,
-  capability setuid,
-  capability setgid,
-
-  # Signals for S6-Overlay process management
+  # Capabilities
+  file,
   signal (send) set=(kill,term,int,hup,cont),
-  signal (receive) peer=*_homedetector,
 
-  # S6-Overlay system integration
+  # Deny dangerous capabilities
+  deny capability dac_override,
+  deny capability dac_read_search,
+  deny capability setfcap,
+  deny capability setpcap,
+  deny capability sys_admin,
+  deny capability sys_chroot,
+  deny capability sys_ptrace,
+
+  # S6-Overlay
   /init ix,
   /bin/** ix,
   /usr/bin/** ix,
@@ -26,166 +27,29 @@ profile homedetector flags=(attach_disconnected,mediate_deleted) {
   /etc/cont-init.d/** rwix,
   /etc/cont-finish.d/** rwix,
   /run/{,**} rwk,
+  /dev/tty rw,
+  /tmp/** rwk,
 
   # Bashio integration for Home Assistant config
   /usr/lib/bashio/** ix,
 
-  # Temporary files and runtime directories
-  /tmp/** rwk,
-  /var/tmp/** rwk,
-  /dev/tty rw,
-  /dev/null rw,
-  /dev/zero rw,
-  /dev/urandom r,
-
   # Home Assistant add-on configuration and data
   /data/** rw,
   /data/options.json r,
-  /config/** rw,
+  /config/ r,
   /config/hd.db rwk,
   /config/opencanary.conf rw,
 
-  # Shared volumes (mapped volumes specified in config.yaml)
-  /share/** rw,
-
-  # Python virtual environment
-  /env/** rix,
-
-  # Application files
-  /app/** rix,
-  /app/listener.py r,
-  /app/web.py r,
-  /app/static/** r,
-  /app/templates/** r,
-
-  # OpenCanary honeypot configuration
-  /etc/opencanaryd/** rw,
-  /etc/opencanaryd/opencanary.conf rw,
-
-  # System libraries and Python
-  /usr/lib/** rm,
-  /usr/local/lib/** rm,
-  /usr/share/python3** r,
-
-  # Network access
+  # Network access for DNS, HTTP, and honeypot services
   network inet dgram,
   network inet stream,
   network unix dgram,
   network unix stream,
 
-  # DNS listener subprocess - child profile for dns/listener.py
-  /usr/bin/python3 cx -> dns-listener,
-  profile dns-listener flags=(attach_disconnected,mediate_deleted) {
-    #include <abstractions/base>
+  # Python virtual envrionment
+  /env/** rm,
+  /env/bin/** rix,
 
-    # Capabilities for DNS operations
-    capability net_bind_service,
-    capability net_raw,
-
-    # Signals from parent
-    signal (receive) peer=homedetector,
-
-    # Essential system access
-    /bin/** ix,
-    /usr/bin/python3 rix,
-    /run/{,**} rwk,
-    /dev/tty rw,
-    /dev/null rw,
-    /dev/urandom r,
-    /tmp/** rwk,
-
-    # Configuration and data
-    /data/options.json r,
-    /config/hd.db rwk,
-
-    # Python libraries
-    /usr/lib/** rm,
-    /env/** rix,
-
-    # DNS listener application files
-    /app/listener.py r,
-
-    # Network access for DNS
-    network inet dgram,
-    network inet stream,
-    network unix dgram,
-    network unix stream,
-  }
-
-  # Web server subprocess - child profile for admin/web.py
-  /usr/bin/python3 cx -> web-server,
-  profile web-server flags=(attach_disconnected,mediate_deleted) {
-    #include <abstractions/base>
-
-    # Capabilities for web server
-    capability net_bind_service,
-
-    # Signals from parent
-    signal (receive) peer=homedetector,
-
-    # Essential system access
-    /bin/** ix,
-    /usr/bin/python3 rix,
-    /run/{,**} rwk,
-    /dev/tty rw,
-    /dev/null rw,
-    /tmp/** rwk,
-
-    # Configuration and data
-    /data/options.json r,
-    /config/hd.db rwk,
-
-    # Python libraries
-    /usr/lib/** rm,
-    /env/** rix,
-
-    # Web server application files
-    /app/web.py r,
-    /app/static/** r,
-    /app/templates/** r,
-
-    # Network access for web server and Home Assistant API
-    network inet dgram,
-    network inet stream,
-    network unix dgram,
-    network unix stream,
-  }
-
-  # OpenCanary honeypot subprocess
-  /usr/bin/opencanaryd cx -> honeypot,
-  profile honeypot flags=(attach_disconnected,mediate_deleted) {
-    #include <abstractions/base>
-
-    # Capabilities for honeypot network services
-    capability net_bind_service,
-
-    # Signals from parent
-    signal (receive) peer=homedetector,
-
-    # Essential system access
-    /bin/** ix,
-    /usr/bin/opencanaryd rix,
-    /usr/bin/python3 rix,
-    /usr/bin/bash rix,
-    /run/{,**} rwk,
-    /dev/tty rw,
-    /dev/null rw,
-    /tmp/** rwk,
-    /var/tmp/** rwk,
-
-    # OpenCanary configuration
-    /etc/opencanaryd/opencanary.conf r,
-    /config/opencanary.conf r,
-    /config/hd.db r,
-
-    # Python libraries
-    /usr/lib/** rm,
-    /env/** rix,
-
-    # Network access for honeypot services
-    network inet dgram,
-    network inet stream,
-    network unix dgram,
-    network unix stream,
-  }
+  # App location
+  /app/** r,
 }
