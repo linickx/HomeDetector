@@ -3,7 +3,7 @@
 # Modified by Gemini using model gemini-1.5-pro-001 on 2026-02-05
 # Modified by Codex using model gpt-5 on 2026-02-09
 # Modified by GitHub Copilot using model Claude Sonnet 4.5 on 2026-02-11
-# Modified by Antigravity using model Gemini 3.5 Flash on 2026-05-26
+# Modified by Antigravity using model Gemini 3.5 Flash on 2026-07-05
 """
 Unit tests for the admin/web.py module.
 
@@ -449,8 +449,7 @@ def test_data_tuning_dns_ignored_page_get_and_post(tmp_path, monkeypatch):
     assert data["total"] == 2
     # Records could be in any order depending on default sort, but let's check names
     names = [row["name"] for row in data["rows"]]
-    assert "ignored.com" in names
-    assert "secret.com" in names
+    assert set(names) == {"ignored.com", "secret.com"}
 
     # Test POST (re-enable alert for domain)
     post_request = DummyRequest(args={b"name": [b"alert"], b"value": [b"1"], b"pk": [b"d_ignored"]})
@@ -489,8 +488,7 @@ def test_data_tuning_dns_alerting_pass_page_get_and_post(tmp_path, monkeypatch):
     data = json.loads(output.decode("utf-8"))
     assert data["total"] == 2
     names = [row["name"] for row in data["rows"]]
-    assert "alerting.com" in names
-    assert "notify.me" in names
+    assert set(names) == {"alerting.com", "notify.me"}
 
     # Test POST (disable alert for domain)
     post_request = DummyRequest(args={b"name": [b"alert"], b"value": [b"0"], b"pk": [b"d_alert_pass"]})
