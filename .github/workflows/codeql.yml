@@ -9,6 +9,7 @@
 # the `language` matrix defined below to confirm you have the correct set of
 # supported CodeQL languages.
 #
+# Modified by GitHub Copilot CLI on 2026-07-05
 name: "CodeQL Advanced"
 
 on:
@@ -18,6 +19,8 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: '34 18 * * 1'
+  workflow_dispatch:
+  workflow_call:
 
 jobs:
   analyze:
@@ -99,3 +102,25 @@ jobs:
       uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"
+
+    - name: Set up Python (for filter script)
+      if: matrix.language == 'python'
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Filter honeypot false positives
+      if: matrix.language == 'python'
+      run: |
+        python3 .github/codeql/codeql-filter.py \
+          'codeql-results.sarif' \
+          'codeql-results-filtered.sarif'
+        mv codeql-results-filtered.sarif codeql-results.sarif
+        echo "CodeQL results filtered to remove honeypot credential logging false positives"
+
+    - name: Upload filtered results to GitHub
+      if: matrix.language == 'python'
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: 'codeql-results.sarif'
+        wait-for-processing: true
