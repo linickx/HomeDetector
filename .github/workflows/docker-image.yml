@@ -1,4 +1,4 @@
-# Modified by Antigravity using model gemini-3.5-flash on 2026-05-31
+# Modified by GitHub Copilot CLI on 2026-07-05
 name: Docker-Image
 
 on:
@@ -14,12 +14,18 @@ permissions:
   contents: read
 
 jobs:
+  codeql:
+    name: Run CodeQL Scan
+    uses: ./.github/workflows/codeql.yml
+
   test-build:
     name: Run Test Build
+    needs: codeql
     uses: ./.github/workflows/test-build.yml
 
   test-python:
     name: Run Python Tests
+    needs: codeql
     uses: ./.github/workflows/test-python.yml
 
   init:

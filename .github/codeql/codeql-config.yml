@@ -1,0 +1,13 @@
+name: "CodeQL Configuration"
+# Modified by GitHub Copilot CLI on 2026-07-05
+# This configuration file enables CodeQL to respect suppression comments and disables false-positive queries.
+# Reference: https://docs.github.com/en/code-security/code-scanning/using-codeql-code-scanning-with-your-existing-ci-system/configuring-codeql-cli-for-scanning
+
+disable-default-queries: false
+
+# Disable the clear-text logging query which produces false positives for honeypot credential logging
+queries:
+  - uses: codeql/python-queries
+    exclude:
+      - py/clear-text-logging-sensitive-data
+

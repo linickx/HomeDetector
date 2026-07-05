@@ -111,6 +111,25 @@ The `run.sh` script is the main entry point. It launches the three key processes
     *   **Admin UI/API**: The web pages, API endpoints for the UI tables, and alert handling logic are in `admin/web.py`. The HTML structure is in the `admin/templates/*.j2` files.
     *   Follow existing Python code style. The code uses standard library features extensively and defines classes for different web pages and backend tasks.
 
+*   **CodeQL Security Scanning**:
+    *   All Python changes must be validated with CodeQL security scanning before submission to ensure no new security vulnerabilities are introduced.
+    *   **Local Verification** (required for all Python changes):
+        ```bash
+        # Generate CodeQL database for Python
+        codeql database create codeql-db --language=python
+        
+        # Run analysis and generate SARIF
+        codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif
+        
+        # Filter honeypot false positives (see docs/CODEQL_SUPPRESSION.md)
+        python3 .github/codeql/codeql-filter.py codeql-results.sarif codeql-results-filtered.sarif
+        
+        # Verify no security findings remain
+        python3 -c "import json; r = json.load(open('codeql-results-filtered.sarif'))['runs'][0]['results']; print(f'Findings: {len(r)}')"
+        ```
+    *   **Known False Positives**: The honeypot component intentionally logs captured attacker credentials for security telemetry. This is legitimate for forensics and alerting purposes. See [docs/CODEQL_SUPPRESSION.md](docs/CODEQL_SUPPRESSION.md) for suppression details.
+    *   **CI/CD Pipeline**: The GitHub Actions workflow automatically runs CodeQL, filters honeypot false positives, and blocks tests if security issues are found. Manual trigger available via `workflow_dispatch`.
+
 *   **Frontend (HTML/JS)**:
     *   The frontend is built with Jinja2 templates located in `admin/templates/`.
     *   The main pages are `admin.j2` (Alerts), `dns.j2` (DNS logs), and `tuning.j2` (Network/Host configuration).
