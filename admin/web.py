@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # pylint: disable=W0718
-# Modified by Gemini using model gemini-2.0-flash on 2026-05-24
+# Modified by Antigravity using model gemini-3.5-flash on 2026-07-05
 import os
 import sys
 import logging
@@ -1341,8 +1341,12 @@ def get_sort_n_order(request, default_sort:str=None, allow_list:list=None):
     except Exception:
         pass
     else:
-        if danger_sort in allow_list:
-            sort = danger_sort
+        # Avoid direct assignment of danger_sort to break taint propagation.
+        # Assign values directly from the trusted allow_list array.
+        for allowed in allow_list:
+            if danger_sort == allowed:
+                sort = allowed
+                break
 
     order = "DESC"
     try:
@@ -1350,8 +1354,11 @@ def get_sort_n_order(request, default_sort:str=None, allow_list:list=None):
     except Exception:
         pass
     else:
-        if danger_order in ['asc', 'desc']:
-            order = danger_order
+        # Explicitly map to trusted literal constants to untaint the value.
+        for allowed_order in ['asc', 'desc']:
+            if danger_order == allowed_order:
+                order = allowed_order
+                break
     return sort, order
 
 def sql_action(sql_str:str=None, sql_param=None):
