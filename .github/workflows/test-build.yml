@@ -3,6 +3,9 @@
 # Modified by GitHub Copilot CLI on 2026-05-25
 name: Test Build
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   workflow_call:
