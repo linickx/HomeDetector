@@ -102,12 +102,29 @@ jobs:
       uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"
+        upload: ${{ matrix.language != 'python' }}
 
     - name: Set up Python (for filter script)
       if: matrix.language == 'python'
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
+
+    - name: Copy SARIF from results directory
+      if: matrix.language == 'python'
+      run: |
+        # CodeQL action v4 outputs to ../results directory
+        if [ -f "../results/python.sarif" ]; then
+          cp ../results/python.sarif ./codeql-results.sarif
+          echo "Copied SARIF from ../results/python.sarif"
+        elif [ -f "../results/codeql-results.sarif" ]; then
+          cp ../results/codeql-results.sarif ./codeql-results.sarif
+          echo "Copied SARIF from ../results/codeql-results.sarif"
+        else
+          echo "Finding SARIF files..."
+          find .. -name "*.sarif" -type f
+          exit 1
+        fi
 
     - name: Filter honeypot false positives
       if: matrix.language == 'python'
