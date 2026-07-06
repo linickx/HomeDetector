@@ -3,6 +3,8 @@
 <!-- Modified by Copilot using model GPT-5 mini on 2026-02-04 -->
 <!-- Modified by GitHub Copilot CLI on 2026-02-06 -->
 <!-- Modified by Gemini using model gemini-3.5-flash on 2026-05-26 -->
+<!-- Modified by GitHub Copilot CLI on 2026-07-06 -->
+<!-- Modified by Copilot using model gpt-5-mini on 2026-07-06 -->
 
 This document provides guidance for AI agents on how to understand, modify, and contribute to the HomeDetector project.
 
@@ -112,23 +114,73 @@ The `run.sh` script is the main entry point. It launches the three key processes
     *   Follow existing Python code style. The code uses standard library features extensively and defines classes for different web pages and backend tasks.
 
 *   **CodeQL Security Scanning**:
-    *   All Python changes must be validated with CodeQL security scanning before submission to ensure no new security vulnerabilities are introduced.
-    *   **Local Verification** (required for all Python changes):
+    *   All Python and GitHub Actions workflow changes must be validated with CodeQL security scanning before submission to ensure no new security vulnerabilities are introduced.
+    
+    *   **When to Scan**:
+        - After modifying any Python code in `dns/`, `admin/`, or `opencanary/` directories
+        - After modifying any GitHub Actions workflow files in `.github/workflows/`
+        - Before committing changes to verify no new security issues are introduced
+    
+    *   **Local Verification for GitHub Actions Workflows**:
+        
+        Note: GitHub Actions workflow scanning requires the `codeql/actions-queries` package, which may not be available in local CodeQL installations by default. The most reliable way to verify workflow changes is through the GitHub Actions CI/CD pipeline.
+
+When running CodeQL locally, ensure required language packs are installed. Examples:
+
+```bash
+codeql pack download codeql/python-queries
+codeql pack download codeql/actions-queries
+```
+
+        
+        **Option 1: Use GitHub Actions CI/CD (Recommended)**
+        - Commit your workflow changes to a branch
+        - Push to GitHub and observe the CodeQL workflow run in GitHub Actions
+        - The `codeql.yml` workflow will automatically scan your workflows and report any findings
+        
+        **Option 2: Local scanning (requires query pack)**
         ```bash
-        # Generate CodeQL database for Python
-        codeql database create codeql-db --language=python
+        # This command may fail if the actions query pack is not installed locally.
+        # To download the query pack first, run:
+        # codeql pack download codeql/actions-queries
+        
+        # Then scan workflows:
+        codeql database create codeql-db-actions --language=actions
+        codeql database analyze codeql-db-actions --format=sarif-latest --output=codeql-actions.sarif
+        
+        # Check for findings
+        python3 -c "import json; r = json.load(open('codeql-actions.sarif'))['runs'][0]['results']; print(f'Workflow findings: {len(r)}'); [print(f'  - {finding[\"ruleId\"]}: {finding[\"message\"][\"text\"][:80]}') for finding in r]"
+        
+        # Clean up
+        rm -rf codeql-db-actions codeql-actions.sarif
+        ```
+    
+    *   **Local Verification for Python Code** (required for all Python changes):
+        ```bash
+        # Create CodeQL database with custom configuration
+        codeql database create codeql-db-python --language=python --source-root . -c=.github/codeql/codeql-config.yml
         
         # Run analysis and generate SARIF
-        codeql database analyze codeql-db --format=sarif-latest --output=codeql-results.sarif
+        codeql database analyze codeql-db-python --format=sarif-latest --output=codeql-results.sarif -c=.github/codeql/codeql-config.yml
         
         # Filter honeypot false positives (see docs/CODEQL_SUPPRESSION.md)
         python3 .github/codeql/codeql-filter.py codeql-results.sarif codeql-results-filtered.sarif
         
         # Verify no security findings remain
-        python3 -c "import json; r = json.load(open('codeql-results-filtered.sarif'))['runs'][0]['results']; print(f'Findings: {len(r)}')"
+        python3 -c "import json; r = json.load(open('codeql-results-filtered.sarif'))['runs'][0]['results']; print(f'Python findings after filtering: {len(r)}'); [print(f'  - {finding[\"ruleId\"]}: {finding[\"message\"][\"text\"][:80]}') for finding in r]; exit(1 if len(r) > 0 else 0)"
+        
+        # Clean up
+        rm -rf codeql-db-python codeql-results.sarif codeql-results-filtered.sarif
         ```
-    *   **Known False Positives**: The honeypot component intentionally logs captured attacker credentials for security telemetry. This is legitimate for forensics and alerting purposes. See [docs/CODEQL_SUPPRESSION.md](docs/CODEQL_SUPPRESSION.md) for suppression details.
-    *   **CI/CD Pipeline**: The GitHub Actions workflow automatically runs CodeQL, filters honeypot false positives, and blocks tests if security issues are found. Manual trigger available via `workflow_dispatch`.
+    
+    *   **Success Criteria**:
+        - GitHub Actions workflows: Zero findings reported
+        - Python code: Zero findings after filtering (known honeypot false positives are expected to be filtered)
+        - If either scan shows findings, do not commit until they are resolved
+    
+    *   **Known False Positives**: The honeypot component intentionally logs captured attacker credentials for security telemetry. This is legitimate for forensics and alerting purposes. See [docs/CODEQL_SUPPRESSION.md](docs/CODEQL_SUPPRESSION.md) for suppression details. The filter script automatically removes these known false positives.
+    
+    *   **CI/CD Pipeline**: The GitHub Actions workflow (`codeql.yml`) automatically runs CodeQL for both Python and GitHub Actions languages, filters honeypot false positives, and blocks tests if security issues are found. Manual trigger available via `workflow_dispatch`. These local verification commands mirror what the CI/CD pipeline does.
 
 *   **Frontend (HTML/JS)**:
     *   The frontend is built with Jinja2 templates located in `admin/templates/`.
