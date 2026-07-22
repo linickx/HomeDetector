@@ -1,4 +1,5 @@
 # Created by GitHub Copilot CLI on 2026-05-25
+# Modified by Antigravity using model Gemini 3.6 Flash on 2026-07-22
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
@@ -40,11 +41,11 @@ dns = [
     "requests==2.33.0",
 ]
 admin = [
-    "Twisted==24.11.0",
+    "Twisted==26.4.0",
     "Jinja2==3.1.6",
 ]
 honeypot = [
-    "opencanary==0.9.8",
+    "opencanary==0.9.9",
 ]
 # Install all runtime components
 all = [
