@@ -18,15 +18,17 @@ COPY dns/requirements.txt /tmp/dns.requirements.txt
 COPY admin/requirements.txt /tmp/admin.requirements.txt
 COPY opencanary/dependency_patches.json /tmp/dependency_patches.json
 COPY opencanary/patch_dependencies.py /tmp/patch_dependencies.py
+COPY opencanary/VERSION /tmp/OPENCANARY_VERSION
 
 RUN virtualenv /env
 ENV PATH="/env/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r /tmp/dns.requirements.txt
-RUN git clone --depth 1 https://github.com/thinkst/opencanary.git /tmp/opencanary \
+RUN OPENCANARY_VERSION=$(cat /tmp/OPENCANARY_VERSION) \
+    && git clone --depth 1 --branch "${OPENCANARY_VERSION}" https://github.com/thinkst/opencanary.git /tmp/opencanary \
     && python3 /tmp/patch_dependencies.py --target /tmp/opencanary/pyproject.toml --config /tmp/dependency_patches.json \
     && pip install --no-cache-dir /tmp/opencanary \
-    && rm -rf /tmp/opencanary /tmp/patch_dependencies.py /tmp/dependency_patches.json
+    && rm -rf /tmp/opencanary /tmp/patch_dependencies.py /tmp/dependency_patches.json /tmp/OPENCANARY_VERSION
 RUN pip install --no-cache-dir -r /tmp/admin.requirements.txt
 
 # Stage 2: Minimal runtime image

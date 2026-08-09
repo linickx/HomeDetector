@@ -1,1 +1,1 @@
-git+https://github.com/thinkst/opencanary.git
+git+https://github.com/thinkst/opencanary.git@v0.9.9
