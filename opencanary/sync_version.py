@@ -108,7 +108,8 @@ def set_version(new_version: str) -> None:
     """Set new version in opencanary/VERSION and sync all files."""
     with open(VERSION_FILE, "w", encoding="utf-8") as f:
         f.write(f"{new_version}\n")
-    print(f"Updated {VERSION_FILE} to {new_version}")
+    rel_version_file = os.path.relpath(VERSION_FILE, BASE_DIR)
+    print(f"Updated {rel_version_file} to {new_version}")
     sync_all(new_version)
 
 
