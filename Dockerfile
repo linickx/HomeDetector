@@ -16,15 +16,17 @@ RUN apk add --no-cache \
 
 COPY dns/requirements.txt /tmp/dns.requirements.txt
 COPY admin/requirements.txt /tmp/admin.requirements.txt
+COPY opencanary/dependency_patches.json /tmp/dependency_patches.json
+COPY opencanary/patch_dependencies.py /tmp/patch_dependencies.py
 
 RUN virtualenv /env
 ENV PATH="/env/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r /tmp/dns.requirements.txt
 RUN git clone --depth 1 https://github.com/thinkst/opencanary.git /tmp/opencanary \
-    && python3 -c "import re; p='/tmp/opencanary/pyproject.toml'; c=open(p).read(); open(p,'w').write(re.sub(r'simplejson==[0-9.]+', 'simplejson==4.1.1', c))" \
+    && python3 /tmp/patch_dependencies.py --target /tmp/opencanary/pyproject.toml --config /tmp/dependency_patches.json \
     && pip install --no-cache-dir /tmp/opencanary \
-    && rm -rf /tmp/opencanary
+    && rm -rf /tmp/opencanary /tmp/patch_dependencies.py /tmp/dependency_patches.json
 RUN pip install --no-cache-dir -r /tmp/admin.requirements.txt
 
 # Stage 2: Minimal runtime image
