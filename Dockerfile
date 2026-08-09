@@ -1,5 +1,33 @@
+# Modified by Antigravity using model Gemini 3.6 Flash on 2026-08-09
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-dockerfile
 # https://github.com/home-assistant/docker-base
+FROM ghcr.io/home-assistant/base:latest AS builder
+
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    py3-virtualenv \
+    python3-dev \
+    gcc \
+    build-base \
+    libffi-dev \
+    openssl-dev \
+    git
+
+COPY dns/requirements.txt /tmp/dns.requirements.txt
+COPY admin/requirements.txt /tmp/admin.requirements.txt
+
+RUN virtualenv /env
+ENV PATH="/env/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r /tmp/dns.requirements.txt
+RUN git clone --depth 1 https://github.com/thinkst/opencanary.git /tmp/opencanary \
+    && python3 -c "import re; p='/tmp/opencanary/pyproject.toml'; c=open(p).read(); open(p,'w').write(re.sub(r'simplejson==[0-9.]+', 'simplejson==4.1.1', c))" \
+    && pip install --no-cache-dir /tmp/opencanary \
+    && rm -rf /tmp/opencanary
+RUN pip install --no-cache-dir -r /tmp/admin.requirements.txt
+
+# Stage 2: Minimal runtime image
 FROM ghcr.io/home-assistant/base:latest
 
 LABEL \
@@ -8,39 +36,22 @@ LABEL \
     org.opencontainers.image.source="https://github.com/linickx/HomeDetector" \
     org.opencontainers.image.licenses="MIT License"
 
-# DNS Listener APKs
-RUN apk add --no-cache python3 py3-pip py3-virtualenv
-# OpenCanary APKs
-RUN apk add --no-cache python3-dev bash gcc build-base libffi-dev openssl-dev
+RUN apk add --no-cache python3 bash libffi openssl
 
-# Python Deps, per module (tmp)
-COPY dns/requirements.txt /tmp/dns.requirements.txt
-COPY opencanary/requirements.txt /tmp/oc.requirements.txt
-COPY admin/requirements.txt /tmp/admin.requirements.txt
+# Copy built virtualenv from builder stage
+COPY --from=builder /env /env
 
-# Our App Root
-RUN mkdir /app/
-RUN mkdir /app/static
+ENV VIRTUAL_ENV="/env"
+ENV PATH="/env/bin:$PATH"
 
-# App Dependencies
+# Copy App Files
+RUN mkdir -p /app/static
 COPY opencanary/opencanary.conf /etc/opencanaryd/opencanary.conf
 COPY admin/static/ /app/static/
 COPY admin/templates/* /app/templates/
-
-# My custom python apps...
 COPY dns/listener.py /app/
 COPY admin/web.py /app/
 
-# Setup Python Env...
-RUN virtualenv /env
-ENV VIRTUAL_ENV="/env"
-ENV PATH="/env/bin:$PATH"
-RUN pip install --upgrade pip
-RUN pip install --requirement /tmp/dns.requirements.txt
-RUN pip install --requirement /tmp/oc.requirements.txt
-RUN pip install --requirement /tmp/admin.requirements.txt
-
-# And Finally...
 COPY run.sh /
 RUN chmod a+x /run.sh
 CMD [ "/run.sh" ]
