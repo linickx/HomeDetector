@@ -1,4 +1,4 @@
-# Modified by Antigravity using model Gemini 3.6 Flash on 2026-08-09
+# Modified by Antigravity using model Claude Opus 4.6 on 2026-08-10
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-dockerfile
 # https://github.com/home-assistant/docker-base
 FROM ghcr.io/home-assistant/base:latest AS builder
@@ -40,7 +40,7 @@ LABEL \
     org.opencontainers.image.source="https://github.com/linickx/HomeDetector" \
     org.opencontainers.image.licenses="MIT License"
 
-RUN apk add --no-cache python3 bash libffi openssl
+RUN apk add --no-cache python3 bash libffi openssl libc-dev
 
 # Copy built virtualenv from builder stage
 COPY --from=builder /env /env
