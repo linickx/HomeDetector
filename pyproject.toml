@@ -44,7 +44,7 @@ admin = [
     "Jinja2==3.1.6",
 ]
 honeypot = [
-    "opencanary==0.9.8",
+    "opencanary @ git+https://github.com/thinkst/opencanary.git@v0.9.9",
 ]
 # Install all runtime components
 all = [

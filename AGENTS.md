@@ -1,10 +1,6 @@
 # Agent Instructions for HomeDetector
 <!-- Created by Copilot using model Claude Haiku 4.5 on 2026-02-01 -->
-<!-- Modified by Copilot using model GPT-5 mini on 2026-02-04 -->
-<!-- Modified by GitHub Copilot CLI on 2026-02-06 -->
-<!-- Modified by Gemini using model gemini-3.5-flash on 2026-05-26 -->
-<!-- Modified by GitHub Copilot CLI on 2026-07-06 -->
-<!-- Modified by Copilot using model gpt-5-mini on 2026-07-06 -->
+<!-- Modified by Antigravity using model Gemini 3.6 Flash on 2026-08-09 -->
 
 This document provides guidance for AI agents on how to understand, modify, and contribute to the HomeDetector project.
 
