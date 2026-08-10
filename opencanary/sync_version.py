@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # Created by Antigravity using model Gemini 3.6 Flash on 2026-08-09
+# Modified by Antigravity using model Claude Opus 4.6 on 2026-08-10
 
 """
 Synchronize the OpenCanary release version across project files.
@@ -8,6 +9,8 @@ Synchronize the OpenCanary release version across project files.
 import argparse
 import os
 import re
+import shutil
+import subprocess
 import sys
 
 # Default paths relative to project root
@@ -65,15 +68,53 @@ def sync_requirements(file_path: str, version: str) -> bool:
     return False
 
 
+def refresh_lock() -> bool:
+    """Regenerate uv.lock to match the current pyproject.toml."""
+    uv_bin = shutil.which("uv")
+    if uv_bin is None:
+        print("  - uv.lock: Skipped (uv not found in PATH)")
+        return False
+    result = subprocess.run(
+        [uv_bin, "lock"],
+        cwd=BASE_DIR,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"  - uv.lock: Failed to update\n{result.stderr.strip()}")
+        return False
+    return True
+
+
+def check_lock() -> bool:
+    """Check if uv.lock is up-to-date with pyproject.toml."""
+    uv_bin = shutil.which("uv")
+    if uv_bin is None:
+        print("Skipped: uv.lock check (uv not found in PATH)")
+        return True  # Non-fatal if uv isn't available
+    result = subprocess.run(
+        [uv_bin, "lock", "--check"],
+        cwd=BASE_DIR,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print("Out of sync: uv.lock does not match pyproject.toml")
+        return False
+    return True
+
+
 def sync_all(version: str) -> None:
     """Synchronize all project files to match the given version."""
     py_updated = sync_pyproject(PYPROJECT_FILE, version)
     req_updated = sync_requirements(REQUIREMENTS_FILE, version)
+    lock_updated = refresh_lock()
 
     print(f"Synchronized version {version}:")
     print(f"  - pyproject.toml: {'Updated' if py_updated else 'In sync'}")
     print(f"  - opencanary/requirements.txt: {'Updated' if req_updated else 'In sync'}")
     print("  - Dockerfile: Dynamic (reads opencanary/VERSION automatically)")
+    print(f"  - uv.lock: {'Updated' if lock_updated else 'In sync'}")
 
 
 def check_sync(version: str) -> bool:
@@ -98,6 +139,9 @@ def check_sync(version: str) -> bool:
             if "COPY opencanary/VERSION /tmp/OPENCANARY_VERSION" not in docker_content:
                 print("Out of sync: Dockerfile does not copy opencanary/VERSION")
                 is_in_sync = False
+
+    if not check_lock():
+        is_in_sync = False
 
     if is_in_sync:
         print(f"All files are fully in sync with OpenCanary {version}!")

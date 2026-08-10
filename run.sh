@@ -18,6 +18,11 @@ done
 echo "Starting the Admin Web Server..."
 python3 /app/web.py &
 
+if [ ! -d "/config" ]; then
+    echo "Not running on Home Assistant, creating /config"
+    mkdir /config
+fi
+
 if [ ! -f /config/opencanary.conf ]; then
     echo "👉🏼 Writing default opencanary.conf"
 	cp /etc/opencanaryd/opencanary.conf /config/opencanary.conf
