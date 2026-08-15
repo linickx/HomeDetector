@@ -31,7 +31,7 @@ else
     cp /config/opencanary.conf /etc/opencanaryd/opencanary.conf
 fi
 sleep 1
-echo "Starting the HoneyPot (OpenCanary)..."
+echo "Starting the HoneyPot - OpenCanary $(opencanaryd --version)..."
 opencanaryd --start
 
 sleep 1

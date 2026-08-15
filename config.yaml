@@ -7,7 +7,7 @@ ingress: true
 ingress_entry: admin
 init: false
 map:
-- addon_config:rw
+- app_config:rw
 name: Home Detector
 options:
   custom_host_records: []
@@ -55,4 +55,4 @@ schema:
 slug: homedetector
 startup: application
 url: https://github.com/linickx/HomeDetector
-version: 0.1.1
+version: 0.1.2
